@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<head>
+
+<title>disting EX Screenshot Tool</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans">
+
+<style>
+body {
+	font-family: 'PT Sans', serif;
+}
+button {
+	font-family: 'PT Sans', serif;
+}
+button.big {
+	font-size: 120%;
+}
+select {
+	font-family: 'PT Sans', serif;
+}
+div.small {
+	font-size: 80%;
+}
+td.tc {
+	text-align: center;
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+tr.a {
+	background-color: #e0e0e0;
+}
+th {
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+textarea {
+    font-family: monospace;
+}
+</style>
+
+<script>
+function log( t ) {
+	var ta = document.getElementById( "log" );
+	var d = new Date();
+	var dd = d.toLocaleTimeString();
+	ta.value = ta.value + "\n" + dd + ": " + t;
+	ta.scrollTop = ta.scrollHeight;
+	return dd;
+}
+function status( t ) {
+    document.getElementById( "status" ).innerHTML = "Web MIDI status: " + t;
+}
+function nybbleChar( n ) {
+	if ( n >= 10 ) {
+		return String.fromCharCode( 'A'.charCodeAt( 0 ) + n - 10 );
+	}
+	return String.fromCharCode( '0'.charCodeAt( 0 ) + n );
+}
+function makeMsgSysEx() {
+	var d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x02]
+	var len = d.length
+	var str = ""
+	for ( var i = 0; i < len; ++i ) {
+		str += String.fromCharCode( d[i] );
+	} 
+	var text = "Hello!\nThis message\nwas sent from\nthe config tool.";
+	str += text;
+	str += String.fromCharCode( 0xF7 );
+	return str;
+}
+function dumpSysex( data, id, prefix ) {
+	var len = data.length
+	var h = prefix
+	for ( var i = 0; i < len; ++i ) {
+		var b = data[ i ];
+		h += nybbleChar( b >> 4 );
+		h += nybbleChar( b & 0xf );
+		h += " ";
+		if ( ( i & 0xf ) === 0xf ) {
+			h += "\n";
+		}
+	} 
+	document.getElementById( id ).value = h;
+}
+</script>
+
+</head>
+
+<body>
+
+<div class="small">
+At the time of writing this will work only in Google's <a href="http://www.google.com/chrome/">Chrome</a> browser. Chrome may block SysEx access if you run this from a website, in which case download the html file locally and run it from there.
+</div>
+<div class="small" id="status"></div>
+<p>
+
+<!--<button onclick="sendMsg()">Send Msg</button>-->
+<button class="big" onclick="request()">Take Screenshot</button>
+Send to MIDI port: <select id="midioutput"></select>
+Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+<p>
+<textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
+<textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
+<textarea rows=5 cols=45 name="text" id="rxSysex"></textarea>
+<p>
+<img id="result" />
+<p>
+
+<script>
+function processScreenshot( data ) {
+	var arr = new Uint8Array( 512 );
+	for ( var i=0; i<512; ++i ) {
+		arr[i] = data[2*i] | ( data[2*i+1]<<7 );
+	}
+	var screen = new Uint32Array( 128 );
+	for ( var i=0; i<128; ++i ) {
+		screen[i] = arr[4*i] | ( arr[4*i+1]<<8 ) | ( arr[4*i+2]<<16 ) | ( arr[4*i+3]<<24 );
+	}
+
+	var canvas=document.createElement("canvas");
+	var ctx=canvas.getContext("2d");
+	canvas.width=128;
+	canvas.height=32;
+	var imgData=ctx.getImageData(0,0,128,32);
+	var d=imgData.data;
+	var x, y;
+	for ( y=31; y>=0; --y )
+	{
+		for ( x=0; x<128; ++x )
+		{
+			var pix = 128*y + x;
+			var v = ( screen[x] & (1<<y) ) ? 0xff : 0;
+			d[4*pix+0] = 0;
+			d[4*pix+1] = v;
+			d[4*pix+2] = v;
+			d[4*pix+3] = 0xff;
+		}
+	}
+	ctx.putImageData(imgData,0,0);
+	document.getElementById( "result" ).src=canvas.toDataURL();
+}
+</script>
+
+<script>
+var midi, data;
+if ( navigator.requestMIDIAccess ) {
+    navigator.requestMIDIAccess ( {
+        sysex: true
+    } ).then(onMIDISuccess, onMIDIFailure);
+} else {
+    status("No MIDI support in your browser.");
+}
+function onMIDISuccess(midiAccess) {
+    midi = midiAccess;
+    var str = "";
+    var fh2 = -1;
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
+	    if ( input.value.name == "FH-2" ) {
+		    fh2 = input.value.id;
+	    }
+    }
+    document.getElementById( "midiinput" ).innerHTML = str
+    if ( fh2 >= 0 ) {
+	    document.getElementById( "midiinput" ).value = fh2;
+    }
+    str = "";
+    fh2 = -1;
+    var outputs = midi.outputs.values();
+    for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
+	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
+	    if ( output.value.name == "FH-2" ) {
+		    fh2 = output.value.id;
+	    }
+    }
+    document.getElementById( "midioutput" ).innerHTML = str
+    if ( fh2 >= 0 ) {
+	    document.getElementById( "midioutput" ).value = fh2;
+    }
+
+	changeInput();
+
+	log( "midi access granted" );
+    status("OK");
+}
+function onMIDIFailure(e) {
+	log( "midi access failure" );
+    status("No access to MIDI devices or your browser doesn't support WebMIDI API.");
+}
+function changeInput() {
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+    	input.value.onmidimessage = "";
+    }
+	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
+	input.onmidimessage = onMIDIMessage;
+}
+function onMIDIMessage(message) {
+    data = message.data;
+    var header = [ 240, 0, 33, 39, 0x5D ];
+    for ( var i=0; i<5; ++i ) {
+    	if ( header[i] != data[i] ) {
+    		return;
+    	}
+    }
+	var dd = log( "received sysex (" + data.length + " bytes)" );
+	dumpSysex( data, "rxSysex", dd+"\n" );
+	if ( data[5] == 0x33 ) {
+		processScreenshot( data.slice( 8, -1 ) );
+	}
+}
+function request() {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x01, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent screenshot request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function sendMsg() {
+	var str = makeMsgSysEx();
+	var arr = new Uint8Array( str.length );
+	for ( var i=0; i<str.length; ++i ) {
+		arr[i] = str.charCodeAt( i );
+	}
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	output.send( arr );
+	var dd = log( "sent sysex (" + str.length + " bytes)" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+</script>
+
+</body>

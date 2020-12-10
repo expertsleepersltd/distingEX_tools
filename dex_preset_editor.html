@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<head>
+
+<title>disting EX Preset Editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans">
+
+<style>
+body {
+	font-family: 'PT Sans', serif;
+}
+button {
+	font-family: 'PT Sans', serif;
+}
+button.big {
+	font-size: 120%;
+}
+select {
+	font-family: 'PT Sans', serif;
+}
+div.small {
+	font-size: 80%;
+}
+td.tc {
+	text-align: center;
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+tr.a {
+	background-color: #e0e0e0;
+}
+th {
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+textarea {
+    font-family: monospace;
+}
+input.param_v {
+	width: 50px;
+}
+input.param_s {
+	width: 400px;
+	height: 10px;
+	-webkit-appearance: none;
+	background-color: #f0f0f0;
+	-webkit-border-radius: 20px;
+}
+button.param_def {
+	width: 40px;
+}
+div#alg_name {
+	display: inline;
+	margin-left: 10px;
+}
+</style>
+
+<script>
+function log( t ) {
+	var ta = document.getElementById( "log" );
+	var d = new Date();
+	var dd = d.toLocaleTimeString();
+	ta.value = ta.value + "\n" + dd + ": " + t;
+	ta.scrollTop = ta.scrollHeight;
+	return dd;
+}
+function status( t ) {
+    document.getElementById( "status" ).innerHTML = "Web MIDI status: " + t;
+}
+function nybbleChar( n ) {
+	if ( n >= 10 ) {
+		return String.fromCharCode( 'A'.charCodeAt( 0 ) + n - 10 );
+	}
+	return String.fromCharCode( '0'.charCodeAt( 0 ) + n );
+}
+function makeMsgSysEx() {
+	var d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x02]
+	var len = d.length
+	var str = ""
+	for ( var i = 0; i < len; ++i ) {
+		str += String.fromCharCode( d[i] );
+	} 
+	var text = "Hello!\nThis message\nwas sent from\nthe config tool.";
+	str += text;
+	str += String.fromCharCode( 0xF7 );
+	return str;
+}
+function dumpSysex( data, id, prefix ) {
+	var len = data.length
+	var h = prefix
+	for ( var i = 0; i < len; ++i ) {
+		var b = data[ i ];
+		h += nybbleChar( b >> 4 );
+		h += nybbleChar( b & 0xf );
+		h += " ";
+		if ( ( i & 0xf ) === 0xf ) {
+			h += "\n";
+		}
+	} 
+	document.getElementById( id ).value = h;
+}
+</script>
+
+</head>
+
+<body>
+
+<div class="small">
+At the time of writing this will work only in Google's <a href="http://www.google.com/chrome/">Chrome</a> browser. Chrome may block SysEx access if you run this from a website, in which case download the html file locally and run it from there.
+</div>
+<div class="small" id="status"></div>
+<p>
+
+<!--<button onclick="sendMsg()">Send Msg</button>-->
+<button class="big" onclick="request()">Refresh</button>
+Send to MIDI port: <select id="midioutput"></select>
+Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+<p>
+<textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
+<textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
+<textarea rows=5 cols=45 name="text" id="rxSysex"></textarea>
+</p>
+<label for="auto_focus">Auto-focus:</label><input id='auto_focus' type='checkbox' checked>
+<br>
+<label for="alg_name">Algorithm:</label><div id='alg_name'></div>
+<br>
+<label for="preset_name">Preset name:</label><input id='preset_name' accesskey='n' type='text' onchange='send_preset_name()'>
+<div id='parameters'></div>
+
+<script>
+function processAlgorithm( data ) {
+	var isDual = data[0];
+	var alg0 = data[1];
+	var alg1 = data[2];
+	if ( isDual ) {
+	} else {
+		var name = "";
+		for ( var i = 0; i < 100; ++i ) {
+			var n = data[3+i];
+			if ( n == 0 ) {
+				break;
+			}
+			name += String.fromCharCode( n );
+		}
+		document.getElementById( "alg_name" ).innerHTML = (alg0+1) + " - " + name;
+	}
+}
+
+function processPresetName( data ) {
+	var name = "";
+	for ( var i = 0; i < 16; ++i ) {
+		var n = data[i];
+		if ( n == 0 ) {
+			break;
+		}
+		name += String.fromCharCode( n );
+	}
+	document.getElementById( "preset_name" ).value = name;
+}
+
+unitStrings = [];
+function processUnitStrings( data ) {
+	var num = data[0];
+	var c = 1;
+	unitStrings = [];
+    for ( var j = 0; j < num; ++j ) {
+		var name = "";
+		for ( var i = 0; i < 100; ++i ) {
+			var n = data[c++];
+			if ( n == 0 ) {
+				break;
+			}
+			name += String.fromCharCode( n );
+		}
+		unitStrings.push( name );
+	}
+}
+
+function processEnumStrings( data ) {
+	var p = data[0];
+	var num = data[1];
+	var c = 2;
+	var str = "";
+    for ( var j = 0; j < num; ++j ) {
+		var name = "";
+		for ( var i = 0; i < 100; ++i ) {
+			var n = data[c++];
+			if ( n == 0 ) {
+				break;
+			}
+			name += String.fromCharCode( n );
+		}
+		str += "<option value=" + j + ">" + name + "</option>";
+	}
+	var e = document.getElementById( "p" + p + "_e" );
+	e.innerHTML = str;
+	e.value = document.getElementById( "p" + p + "_s" ).value;
+	e.style = 'display:inline;';
+}
+
+nextParameterToGet = 0;
+numParametersToGet = 0;
+function getNextParameter() {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x43, nextParameterToGet, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent parameter info request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	
+	nextParameterToGet += 1;
+	if ( nextParameterToGet < numParametersToGet )
+		setTimeout( getNextParameter, 20 );
+}
+
+function processNumParameters( num ) {
+	var str = "<table>";
+	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th></tr>";
+	var i;
+	for ( i=0; i<num; ++i ) {
+		str += "<tr class=" + ((i&1)?"a":"b") + "><td>" + (i+1) + "</td>";
+		str += "<td id=p" + i + "_name>" + "</td>";
+		str += "<td id=p" + i + "_min>" + "</td>";
+		str += "<td id=p" + i + "_max>" + "</td>";
+		var focus = " onfocus='param_focus(" + i + ")' ";
+		str += "<td><button id=p" + i + "_def class='param_def' onclick='param_def(" + i + ")'" + focus + "></button></td>";
+		str += "<td id=p" + i + "_unit>" + "</td>";
+		str += "<td><input id=p" + i + "_v type='number' class='param_v' size=6 onchange='param_text(" + i + ")'" + focus + ">" + "</td>";
+		str += "<td>";
+		str += "<input id=p" + i + "_s type='range' min='-32768' max='32767' class='param_s' onInput='param_slider(" + i + ")' ondblclick='param_def(" + i + ")'" + focus + ">";
+		str += "<select id=p" + i + "_e class='param_e' onchange='param_enum(" + i + ")' style='display:none;'" + focus + "></select>";
+		str += "<input id=p" + i + "_c type='checkbox' class='param_c' onchange='param_check(" + i + ")' style='display:none;'" + focus + ">";
+		str += "</td>";
+		str += "</tr>";
+	}
+	str += "</table>";
+	document.getElementById( "parameters" ).innerHTML = str;
+	nextParameterToGet = 0;
+	numParametersToGet = num;
+	setTimeout( getNextParameter, 20 );
+
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x44, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent parameter values request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function extractShort( data ) {
+	var v = ( data[0] << 14 ) | ( data[1] << 7 ) | ( data[2] );
+	v = ( v << 16 ) >> 16;
+	return v;
+}
+
+function processParameterInfo( data ) {
+	var p = data[0];
+	var min = extractShort( data.slice( 1, 4 ) );
+	var max = extractShort( data.slice( 4, 7 ) );
+	var def = extractShort( data.slice( 7, 10 ) );
+	var unit = data[10];
+	var name = "";
+	for ( var i = 0; i < 16; ++i ) {
+		var n = data[11+i];
+		if ( n == 0 ) {
+			break;
+		}
+		name += String.fromCharCode( n );
+	}
+	document.getElementById( "p" + p + "_min" ).innerHTML = min;
+	document.getElementById( "p" + p + "_max" ).innerHTML = max;
+	document.getElementById( "p" + p + "_def" ).innerHTML = def;
+	var unitStr = "";
+	if ( unit == 1 ) {
+		var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x49, p, 0xF7 ];
+		output.send( arr );
+		var dd = log( "sent enum string request to disting EX" );
+		dumpSysex( arr, "txSysex", dd+"\n" );
+	} else if ( unit == 0 && min == 0 && max == 1 ) {
+		var e = document.getElementById( "p" + p + "_c" );
+		var v = document.getElementById( "p" + p + "_s" ).value;
+		e.checked = v != 0;
+		e.style = 'display:inline;';
+	} else if ( unit > 0 && (unit-1) < unitStrings.length ) {
+		unitStr = unitStrings[ unit-1 ];
+	}
+	document.getElementById( "p" + p + "_unit" ).innerHTML = unitStr;
+	document.getElementById( "p" + p + "_name" ).innerHTML = name;
+	var s = document.getElementById( "p" + p + "_s" );
+	s.min = min;
+	s.max = max;
+}
+
+function processAllParameterValues( data ) {
+	var p;
+	var num = data.length / 3;
+	var c = 0;
+	for ( p=0; p<num; ++p ) {
+		var v = extractShort( data.slice( c, c+3 ) );
+		c += 3;
+		document.getElementById( "p" + p + "_v" ).value = v;
+	    document.getElementById( "p" + p + "_s" ).value = v;
+	    document.getElementById( "p" + p + "_e" ).value = v;
+	    document.getElementById( "p" + p + "_c" ).checked = v;
+	}
+}
+
+function processParameterValue( data ) {
+	var p = data[0];
+	var v = extractShort( data.slice( 1, 4 ) );
+    document.getElementById( "p" + p + "_v" ).value = v;
+    document.getElementById( "p" + p + "_s" ).value = v;
+    document.getElementById( "p" + p + "_e" ).value = v;
+    document.getElementById( "p" + p + "_c" ).checked = v;
+}
+
+function requestParameterValue( p ) {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x45, p, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent parameter value request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function send_preset_name() {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x47 ];
+	var name = document.getElementById( "preset_name" ).value;
+	name += "                ";
+	name = name.substring( 0, 16 );
+	for ( var i = 0; i < 16; ++i ) {
+		arr[6+i] = name.charCodeAt( i );
+	}
+	arr.push( 0xF7 );
+	output.send( arr );
+	var dd = log( "sent preset name update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function sendSetValue( p, v ) {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x46, p, (v>>14)&3, (v>>7)&0x7f, v&0x7f, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent parameter update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	setTimeout( requestParameterValue( p ), 5 );
+}
+
+function param_def( p ) {
+	var v = document.getElementById( "p" + p + "_def" ).innerHTML;
+	sendSetValue( p, v );
+}
+
+function param_slider( p ) {
+	var v = document.getElementById( "p" + p + "_s" ).value;
+	sendSetValue( p, v );
+}
+
+function param_enum( p ) {
+	var v = document.getElementById( "p" + p + "_e" ).value;
+	sendSetValue( p, v );
+}
+
+function param_check( p ) {
+	var v = document.getElementById( "p" + p + "_c" ).checked;
+	sendSetValue( p, v );
+}
+
+function param_text( p ) {
+	var v = document.getElementById( "p" + p + "_v" ).value;
+	sendSetValue( p, v );
+}
+
+function param_focus( p ) {
+	if ( document.getElementById( 'auto_focus' ).checked ) {
+		var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4A, p, 0xF7 ];
+		output.send( arr );
+		var dd = log( "sent focus update to disting EX" );
+		dumpSysex( arr, "txSysex", dd+"\n" );
+	}
+}
+</script>
+
+<script>
+var midi, data;
+if ( navigator.requestMIDIAccess ) {
+    navigator.requestMIDIAccess ( {
+        sysex: true
+    } ).then(onMIDISuccess, onMIDIFailure);
+} else {
+    status("No MIDI support in your browser.");
+}
+function onMIDISuccess(midiAccess) {
+    midi = midiAccess;
+    var str = "";
+    var fh2 = -1;
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
+	    if ( input.value.name == "FH-2" ) {
+		    fh2 = input.value.id;
+	    }
+    }
+    document.getElementById( "midiinput" ).innerHTML = str
+    if ( fh2 != -1 ) {
+	    document.getElementById( "midiinput" ).value = fh2;
+    }
+    str = "";
+    fh2 = -1;
+    var outputs = midi.outputs.values();
+    for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
+	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
+	    if ( output.value.name == "FH-2" ) {
+		    fh2 = output.value.id;
+	    }
+    }
+    document.getElementById( "midioutput" ).innerHTML = str
+    if ( fh2 != -1 ) {
+	    document.getElementById( "midioutput" ).value = fh2;
+    }
+
+	changeInput();
+
+	log( "midi access granted" );
+    status("OK");
+}
+function onMIDIFailure(e) {
+	log( "midi access failure" );
+    status("No access to MIDI devices or your browser doesn't support WebMIDI API.");
+}
+function changeInput() {
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+    	input.value.onmidimessage = "";
+    }
+	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
+	input.onmidimessage = onMIDIMessage;
+}
+function onMIDIMessage(message) {
+    data = message.data;
+    var header = [ 240, 0, 33, 39, 0x5D ];
+    for ( var i=0; i<5; ++i ) {
+    	if ( header[i] != data[i] ) {
+    		return;
+    	}
+    }
+	var dd = log( "received sysex (" + data.length + " bytes)" );
+	dumpSysex( data, "rxSysex", dd+"\n" );
+	if ( data[5] == 0x40 ) {
+		processAlgorithm( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x41 ) {
+		processPresetName( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x42 ) {
+		processNumParameters( data[6] );
+	} else if ( data[5] == 0x43 ) {
+		processParameterInfo( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x44 ) {
+		processAllParameterValues( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x45 ) {
+		processParameterValue( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x48 ) {
+		processUnitStrings( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x49 ) {
+		processEnumStrings( data.slice( 6, -1 ) );
+	}
+}
+function request() {
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x40, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent algorithm request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x41, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent preset name request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x48, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent unit strings request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x42, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent num parameters request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function sendMsg() {
+	var str = makeMsgSysEx();
+	var arr = new Uint8Array( str.length );
+	for ( var i=0; i<str.length; ++i ) {
+		arr[i] = str.charCodeAt( i );
+	}
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	output.send( arr );
+	var dd = log( "sent sysex (" + str.length + " bytes)" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+</script>
+
+</body>
