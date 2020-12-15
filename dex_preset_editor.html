@@ -52,6 +52,14 @@ div#alg_name {
 	display: inline;
 	margin-left: 10px;
 }
+.hidden {
+	position:absolute;
+	left:-10000px;
+	top:auto;
+	width:1px;
+	height:1px;
+	overflow:hidden;
+}
 </style>
 
 <script>
@@ -110,20 +118,22 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 <div class="small" id="status"></div>
 <p>
 
-<!--<button onclick="sendMsg()">Send Msg</button>-->
-<button class="big" onclick="request()">Refresh</button>
-Send to MIDI port: <select id="midioutput"></select>
-Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+<!--<button  accesskey="s" onclick="sendMsg()">Send Msg</button>-->
+<button class="big"  accesskey="r" onclick="request()">Refresh</button>
+Send to MIDI output port: <select id="midioutput"  accesskey="o"></select>
+Listen on MIDI input port: <select id="midiinput"  accesskey="i" onchange='changeInput()'></select>
 <p>
-<textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
-<textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
-<textarea rows=5 cols=45 name="text" id="rxSysex"></textarea>
+<label class="hidden" for="log">Log:</label><textarea rows=5 cols=50 id="log" accesskey="l" class="log" readOnly></textarea>
+<label class="hidden" for="txSysex">SysEx sent:</label><textarea rows=5 cols=45 name="text" id="txSysex" accesskey="y"></textarea>
+<label class="hidden" for="rxSysex">SysEx received:</label><textarea rows=5 cols=45 name="text" id="rxSysex" accesskey="x"></textarea>
 </p>
-<label for="auto_focus">Auto-focus:</label><input id='auto_focus' type='checkbox' checked>
+<label for="auto_focus">Auto-focus:</label><input id='auto_focus' type='checkbox' checked accesskey="u">
 <br>
-<label for="alg_name">Algorithm:</label><div id='alg_name'></div>
+<div id='alg_name'>
+<label for="active_alg_name">Algorithm:</label><input id='active_alg_name' accesskey='a' type='text' readonly>
+</div>
 <br>
-<label for="preset_name">Preset name:</label><input id='preset_name' accesskey='n' type='text' onchange='send_preset_name()'>
+<label for="preset_name">Preset name:</label><input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
 <div id='parameters'></div>
 
 <script>
@@ -141,7 +151,7 @@ function processAlgorithm( data ) {
 			}
 			name += String.fromCharCode( n );
 		}
-		document.getElementById( "alg_name" ).innerHTML = (alg0+1) + " - " + name;
+		document.getElementById( "active_alg_name" ).value = (alg0+1) + " - " + name;
 	}
 }
 
@@ -213,11 +223,14 @@ function getNextParameter() {
 
 function processNumParameters( num ) {
 	var str = "<table>";
+	str += "<thead>";
 	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th></tr>";
+	str += "</thead><tbody>";
+
 	var i;
 	for ( i=0; i<num; ++i ) {
 		str += "<tr class=" + ((i&1)?"a":"b") + "><td>" + (i+1) + "</td>";
-		str += "<td id=p" + i + "_name>" + "</td>";
+		str += "<td id=p" + i + "_name><h1>" + "</h1></td>";
 		str += "<td id=p" + i + "_min>" + "</td>";
 		str += "<td id=p" + i + "_max>" + "</td>";
 		var focus = " onfocus='param_focus(" + i + ")' ";
@@ -231,7 +244,7 @@ function processNumParameters( num ) {
 		str += "</td>";
 		str += "</tr>";
 	}
-	str += "</table>";
+	str += "</tbody></table>";
 	document.getElementById( "parameters" ).innerHTML = str;
 	nextParameterToGet = 0;
 	numParametersToGet = num;
