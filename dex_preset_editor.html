@@ -128,12 +128,18 @@ Listen on MIDI input port: <select id="midiinput"  accesskey="i" onchange='chang
 <label class="hidden" for="rxSysex">SysEx received:</label><textarea rows=5 cols=45 name="text" id="rxSysex" accesskey="x"></textarea>
 </p>
 <label for="auto_focus">Auto-focus:</label><input id='auto_focus' type='checkbox' checked accesskey="u">
+<label for="show_mapping_cv">Show CV mappings:</label><input id='show_mapping_cv' type='checkbox' accesskey="" onchange="toggleMappings('cv')">
+<label for="show_mapping_knob">Show knob mappings:</label><input id='show_mapping_knob' type='checkbox' accesskey="" onchange="toggleMappings('knob')">
+<label for="show_mapping_button">Show button mappings:</label><input id='show_mapping_button' type='checkbox' accesskey="" onchange="toggleMappings('button')">
+<label for="show_mapping_midi">Show MIDI mappings:</label><input id='show_mapping_midi' type='checkbox' accesskey="" onchange="toggleMappings('midi')">
+<label for="show_mapping_i2c">Show I2C mappings:</label><input id='show_mapping_i2c' type='checkbox' accesskey="" onchange="toggleMappings('i2c')">
 <br>
 <div id='alg_name'>
 <label for="active_alg_name">Algorithm:</label><input id='active_alg_name' accesskey='a' type='text' readonly>
 </div>
 <br>
 <label for="preset_name">Preset name:</label><input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
+<label for="mapping_name">Mapping name:</label><input id='mapping_name' accesskey='' type='text' onchange='send_mapping_name()'>
 <div id='parameters'></div>
 
 <script>
@@ -165,6 +171,51 @@ function processPresetName( data ) {
 		name += String.fromCharCode( n );
 	}
 	document.getElementById( "preset_name" ).value = name;
+}
+
+function processMappingName( data ) {
+	var name = "";
+	for ( var i = 0; i < 16; ++i ) {
+		var n = data[i];
+		if ( n == 0 ) {
+			break;
+		}
+		name += String.fromCharCode( n );
+	}
+	document.getElementById( "mapping_name" ).value = name;
+}
+
+function showMappings( n ) {
+	let vis = document.getElementById( "show_mapping_"+n ).checked ? "table-cell" : "none";
+	let elts = document.getElementsByClassName( 'map_'+n );
+	for ( let e of elts ) {
+    	e.style.display = vis;
+	}
+}
+
+function toggleMappings( n ) {
+	showMappings( n );
+	if ( !mappingRefreshed ) {
+		requestMapping() ;
+	}
+}
+
+var mappingRefreshed = false;
+var mappingTypes = [ "cv", "knob", "button", "midi", "i2c" ];
+
+function anyMappingVisible() {
+	for ( let n of mappingTypes ) {
+		if ( document.getElementById( "show_mapping_"+n ).checked ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function refreshMappingVisibility() {
+	for ( let n of mappingTypes ) {
+		showMappings( n );
+	}
 }
 
 unitStrings = [];
@@ -207,6 +258,68 @@ function processEnumStrings( data ) {
 	e.style = 'display:inline;';
 }
 
+function processMapping( data ) {
+	let c = 0;
+	let version = data[c]; c++;
+	if ( version != 1 ) {
+		alert( "Version of the mapping data does not match the expected value for this version of the tool" );
+		return;
+	}
+	processMappingName( data.slice( c, c+16 ) );
+	c += 16;
+	let count = data[c]; c++;
+	for ( let i=0; i<count; ++i ) {
+		let input = data[c]; c++;
+		let flags = data[c]; c++;
+		let flags2 = data[c]; c++;
+		let scale = extractShort( data.slice( c, c+3 ) ); c += 3;
+		let knobOffset = extractShort( data.slice( c, c+3 ) ); c += 3;
+		let knobScale = extractShort( data.slice( c, c+3 ) ); c += 3;
+		let buttonOffset = extractShort( data.slice( c, c+3 ) ); c += 3;
+
+		document.getElementById( "p" + i + "_cv_input" ).value = input;
+		document.getElementById( "p" + i + "_cv_uni" ).checked = flags & 1;
+		document.getElementById( "p" + i + "_cv_gate" ).checked = flags & 2;
+		document.getElementById( "p" + i + "_cv_scale" ).value = scale/100.0;
+
+		document.getElementById( "p" + i + "_knob_knob" ).value = ( flags & 4 ) ? ( ( flags & 8 ) ? 2 : 1 ) : 0;
+		document.getElementById( "p" + i + "_knob_rel" ).checked = flags & 16;
+		document.getElementById( "p" + i + "_knob_bi" ).checked = flags & 32;
+		document.getElementById( "p" + i + "_knob_offset" ).value = knobOffset/100.0;
+		document.getElementById( "p" + i + "_knob_scale" ).value = knobScale/100.0;
+
+		document.getElementById( "p" + i + "_button_button" ).value = ( flags2 & 1 ) ? ( ( flags2 & 2 ) ? 2 : 1 ) : 0;
+		document.getElementById( "p" + i + "_button_offset" ).value = buttonOffset;
+
+		style_cv_input( i );
+		style_knob_knob( i );
+		style_button_button( i );
+	}
+	for ( let i=0; i<count; ++i ) {
+		let cc = data[c]; c++;
+		let flags = data[c]; c++;
+		let min = extractShort( data.slice( c, c+3 ) ); c += 3;
+		let max = extractShort( data.slice( c, c+3 ) ); c += 3;
+		document.getElementById( "p" + i + "_midi_cc" ).value = cc;
+		document.getElementById( "p" + i + "_midi_en" ).checked = flags & 1;
+		document.getElementById( "p" + i + "_midi_sym" ).checked = flags & 2;
+		document.getElementById( "p" + i + "_midi_min" ).value = min;
+		document.getElementById( "p" + i + "_midi_max" ).value = max;
+	}
+	for ( let i=0; i<count; ++i ) {
+		let cc = data[c]; c++;
+		let flags = data[c]; c++;
+		let min = extractShort( data.slice( c, c+3 ) ); c += 3;
+		let max = extractShort( data.slice( c, c+3 ) ); c += 3;
+		document.getElementById( "p" + i + "_i2c_cc" ).value = cc;
+		document.getElementById( "p" + i + "_i2c_en" ).checked = flags & 1;
+		document.getElementById( "p" + i + "_i2c_sym" ).checked = flags & 2;
+		document.getElementById( "p" + i + "_i2c_min" ).value = min;
+		document.getElementById( "p" + i + "_i2c_max" ).value = max;
+	}
+	mappingRefreshed = true;
+}
+
 nextParameterToGet = 0;
 numParametersToGet = 0;
 function getNextParameter() {
@@ -224,7 +337,14 @@ function getNextParameter() {
 function processNumParameters( num ) {
 	var str = "<table>";
 	str += "<thead>";
-	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th></tr>";
+	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=2 class='map_button'>Button Mapping</th><th colspan=5 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
+	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th>";
+	str += "<th class='map_cv'>Input</th><th class='map_cv'>Unipolar</th><th class='map_cv'>Gate</th><th class='map_cv'>Scale</th>";
+	str += "<th class='map_knob'>Knob</th><th class='map_knob'>Rel</th><th class='map_knob'>Bipolar</th><th class='map_knob'>Offset</th><th class='map_knob'>Scale</th>";
+	str += "<th class='map_button'>Button</th><th class='map_button'>Offset</th>";
+	str += "<th class='map_midi'>CC</th><th class='map_midi'>Enabled</th><th class='map_midi'>Symmetric</th><th class='map_midi'>Min</th><th class='map_midi'>Max</th>";
+	str += "<th class='map_i2c'>ID</th><th class='map_i2c'>Enabled</th><th class='map_i2c'>Symmetric</th><th class='map_i2c'>Min</th><th class='map_i2c'>Max</th>";
+	str += "</tr>";
 	str += "</thead><tbody>";
 
 	var i;
@@ -242,6 +362,35 @@ function processNumParameters( num ) {
 		str += "<select id=p" + i + "_e class='param_e' onchange='param_enum(" + i + ")' style='display:none;'" + focus + "></select>";
 		str += "<input id=p" + i + "_c type='checkbox' class='param_c' onchange='param_check(" + i + ")' style='display:none;'" + focus + ">";
 		str += "</td>";
+
+		if ( i < 64 ) {
+			str += "<td class='map_cv'><select id=p" + i + "_cv_input onchange='mapping_cv_input(" + i + ")'><option value=0>---</option><option value=1>1</option><option value=2>2</option><option value=3>3</option><option value=4>4</option><option value=5>5</option><option value=6>6</option></select></td>";
+			str += "<td class='map_cv'><input id=p" + i + "_cv_uni type='checkbox' class='param_c' onchange='mapping_cv_uni(" + i + ")'></td>";
+			str += "<td class='map_cv'><input id=p" + i + "_cv_gate type='checkbox' class='param_c' onchange='mapping_cv_gate(" + i + ")'></td>";
+			str += "<td class='map_cv'><input id=p" + i + "_cv_scale type='number' class='param_v' size=7 step='0.01' min='-327.68' max='327.67' onchange='mapping_cv_scale(" + i + ")'></td>";
+
+			str += "<td class='map_knob'><select id=p" + i + "_knob_knob onchange='mapping_knob_knob(" + i + ")'><option value=0>---</option><option value=1>Left</option><option value=2>Right</option></select></td>";
+			str += "<td class='map_knob'><input id=p" + i + "_knob_rel type='checkbox' class='param_c' onchange='mapping_knob_rel(" + i + ")'></td>";
+			str += "<td class='map_knob'><input id=p" + i + "_knob_bi type='checkbox' class='param_c' onchange='mapping_knob_bi(" + i + ")'></td>";
+			str += "<td class='map_knob'><input id=p" + i + "_knob_offset type='number' class='param_v' size=7 step='0.01' min='-327.68' max='327.67' onchange='mapping_knob_offset(" + i + ")'></td>";
+			str += "<td class='map_knob'><input id=p" + i + "_knob_scale type='number' class='param_v' size=7 step='0.01' min='-327.68' max='327.67' onchange='mapping_knob_scale(" + i + ")'></td>";
+
+			str += "<td class='map_button'><select id=p" + i + "_button_button onchange='mapping_button_button(" + i + ")'><option value=0>---</option><option value=1>Left</option><option value=2>Right</option></select></td>";
+			str += "<td class='map_button'><input id=p" + i + "_button_offset type='number' class='param_v' size=7 min='-32768' max='32767' onchange='mapping_button_offset(" + i + ")'></td>";
+
+			str += "<td class='map_midi'><input id=p" + i + "_midi_cc type='number' class='param_v' size=3 min='0' max='127' onchange='mapping_midi_cc(" + i + ")'></td>";
+			str += "<td class='map_midi'><input id=p" + i + "_midi_en type='checkbox' class='param_c' onchange='mapping_midi_en(" + i + ")'></td>";
+			str += "<td class='map_midi'><input id=p" + i + "_midi_sym type='checkbox' class='param_c' onchange='mapping_midi_sym(" + i + ")'></td>";
+			str += "<td class='map_midi'><input id=p" + i + "_midi_min type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_midi_min(" + i + ")'></td>";
+			str += "<td class='map_midi'><input id=p" + i + "_midi_max type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_midi_max(" + i + ")'></td>";
+
+			str += "<td class='map_i2c'><input id=p" + i + "_i2c_cc type='number' class='param_v' size=3 min='0' max='127' onchange='mapping_i2c_cc(" + i + ")'></td>";
+			str += "<td class='map_i2c'><input id=p" + i + "_i2c_en type='checkbox' class='param_c' onchange='mapping_i2c_en(" + i + ")'></td>";
+			str += "<td class='map_i2c'><input id=p" + i + "_i2c_sym type='checkbox' class='param_c' onchange='mapping_i2c_sym(" + i + ")'></td>";
+			str += "<td class='map_i2c'><input id=p" + i + "_i2c_min type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_i2c_min(" + i + ")'></td>";
+			str += "<td class='map_i2c'><input id=p" + i + "_i2c_max type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_i2c_max(" + i + ")'></td>";
+		}
+
 		str += "</tr>";
 	}
 	str += "</tbody></table>";
@@ -254,6 +403,20 @@ function processNumParameters( num ) {
 	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x44, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent parameter values request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+
+	refreshMappingVisibility();
+	mappingRefreshed = false;
+	if ( anyMappingVisible() ) {
+		requestMapping();
+	}
+}
+
+function requestMapping() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4B, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent mapping request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
 
@@ -270,7 +433,7 @@ function processParameterInfo( data ) {
 	var def = extractShort( data.slice( 7, 10 ) );
 	var unit = data[10];
 	var name = "";
-	for ( var i = 0; i < 16; ++i ) {
+	for ( var i = 0; i < 24; ++i ) {
 		var n = data[11+i];
 		if ( n == 0 ) {
 			break;
@@ -348,6 +511,21 @@ function send_preset_name() {
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
 
+function send_mapping_name() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4C ];
+	let name = document.getElementById( "mapping_name" ).value;
+	name += "                ";
+	name = name.substring( 0, 16 );
+	for ( var i = 0; i < 16; ++i ) {
+		arr[6+i] = name.charCodeAt( i );
+	}
+	arr.push( 0xF7 );
+	output.send( arr );
+	let dd = log( "sent mapping name update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
 function sendSetValue( p, v ) {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
 	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x46, p, (v>>14)&3, (v>>7)&0x7f, v&0x7f, 0xF7 ];
@@ -390,6 +568,156 @@ function param_focus( p ) {
 		var dd = log( "sent focus update to disting EX" );
 		dumpSysex( arr, "txSysex", dd+"\n" );
 	}
+}
+
+function mapping_send( p ) {
+	let input = document.getElementById( "p" + p + "_cv_input" ).value;
+	let knob = document.getElementById( "p" + p + "_knob_knob" ).value;
+	let button = document.getElementById( "p" + p + "_button_button" ).value;
+	let cv_uni = document.getElementById( "p" + p + "_cv_uni" ).checked;
+	let cv_gate = document.getElementById( "p" + p + "_cv_gate" ).checked;
+	let knob_rel = document.getElementById( "p" + p + "_knob_rel" ).checked;
+	let knob_bi = document.getElementById( "p" + p + "_knob_bi" ).checked;
+	let flags = cv_uni | ( cv_gate << 1 ) | ( knob_rel << 4 ) | ( knob_bi << 5 );
+	if ( knob == 1 ) {
+		flags |= ( 1 << 2 );
+	} else if ( knob == 2 ) {
+		flags |= ( 3 << 2 );
+	}
+	if ( button == 1 ) {
+		flags |= ( 1 << 6 );
+	} else if ( button == 2 ) {
+		flags |= ( 3 << 6 );
+	}
+	let scale = Math.round( document.getElementById( "p" + p + "_cv_scale" ).value * 100 );
+	let knobOffset = Math.round( document.getElementById( "p" + p + "_knob_offset" ).value * 100 );
+	let knobScale = Math.round( document.getElementById( "p" + p + "_knob_scale" ).value * 100 );
+	let buttonOffset = document.getElementById( "p" + p + "_button_offset" ).value;
+
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4D, p, input, flags&0x3f, (flags>>6)&3, (scale>>14)&3, (scale>>7)&0x7f, scale&0x7f, (knobOffset>>14)&3, (knobOffset>>7)&0x7f, knobOffset&0x7f, (knobScale>>14)&3, (knobScale>>7)&0x7f, knobScale&0x7f, (buttonOffset>>14)&3, (buttonOffset>>7)&0x7f, buttonOffset&0x7f, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent midi mapping update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function style_cv_input( p ) {
+	let e = document.getElementById( "p" + p + "_cv_input" );
+	let v = e.value;
+	e.style.background = v > 0 ? "chartreuse" : "";
+}
+
+function mapping_cv_input( p ) {
+	style_cv_input( p );
+	mapping_send( p );
+}
+function mapping_cv_uni( p ) {
+	mapping_send( p );
+}
+function mapping_cv_gate( p ) {
+	mapping_send( p );
+}
+function mapping_cv_scale( p ) {
+	mapping_send( p );
+}
+
+function style_knob_knob( p ) {
+	let e = document.getElementById( "p" + p + "_knob_knob" );
+	let v = e.value;
+	e.style.background = v > 0 ? "chartreuse" : "";
+}
+
+function mapping_knob_knob( p ) {
+	style_knob_knob( p );
+	mapping_send( p );
+}
+function mapping_knob_rel( p ) {
+	mapping_send( p );
+}
+function mapping_knob_bi( p ) {
+	mapping_send( p );
+}
+function mapping_knob_offset( p ) {
+	mapping_send( p );
+}
+function mapping_knob_scale( p ) {
+	mapping_send( p );
+}
+
+function style_button_button( p ) {
+	let e = document.getElementById( "p" + p + "_button_button" );
+	let v = e.value;
+	e.style.background = v > 0 ? "chartreuse" : "";
+}
+
+function mapping_button_button( p ) {
+	style_button_button( p );
+	mapping_send( p );
+}
+function mapping_button_offset( p ) {
+	mapping_send( p );
+}
+
+function mapping_midi( p ) {
+	let cc = document.getElementById( "p" + p + "_midi_cc" ).value;
+	let en = document.getElementById( "p" + p + "_midi_en" ).checked;
+	let sym = document.getElementById( "p" + p + "_midi_sym" ).checked;
+	let flags = en | ( sym << 1 );
+	let min = document.getElementById( "p" + p + "_midi_min" ).value;
+	let max = document.getElementById( "p" + p + "_midi_max" ).value;
+
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4E, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent midi mapping update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function mapping_midi_cc( p ) {
+	mapping_midi( p );
+}
+function mapping_midi_en( p ) {
+	mapping_midi( p );
+}
+function mapping_midi_sym( p ) {
+	mapping_midi( p );
+}
+function mapping_midi_min( p ) {
+	mapping_midi( p );
+}
+function mapping_midi_max( p ) {
+	mapping_midi( p );
+}
+
+function mapping_i2c( p ) {
+	let cc = document.getElementById( "p" + p + "_i2c_cc" ).value;
+	let en = document.getElementById( "p" + p + "_i2c_en" ).checked;
+	let sym = document.getElementById( "p" + p + "_i2c_sym" ).checked;
+	let flags = en | ( sym << 1 );
+	let min = document.getElementById( "p" + p + "_i2c_min" ).value;
+	let max = document.getElementById( "p" + p + "_i2c_max" ).value;
+
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4F, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent midi mapping update to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+function mapping_i2c_cc( p ) {
+	mapping_i2c( p );
+}
+function mapping_i2c_en( p ) {
+	mapping_i2c( p );
+}
+function mapping_i2c_sym( p ) {
+	mapping_i2c( p );
+}
+function mapping_i2c_min( p ) {
+	mapping_i2c( p );
+}
+function mapping_i2c_max( p ) {
+	mapping_i2c( p );
 }
 </script>
 
@@ -474,6 +802,8 @@ function onMIDIMessage(message) {
 		processUnitStrings( data.slice( 6, -1 ) );
 	} else if ( data[5] == 0x49 ) {
 		processEnumStrings( data.slice( 6, -1 ) );
+	} else if ( data[5] == 0x4B ) {
+		processMapping( data.slice( 6, -1 ) );
 	}
 }
 function request() {
@@ -494,6 +824,7 @@ function request() {
 	output.send( arr );
 	var dd = log( "sent num parameters request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
+	mappingRefreshed = false;
 }
 function sendMsg() {
 	var str = makeMsgSysEx();
