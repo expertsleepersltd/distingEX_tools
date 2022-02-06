@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>disting EX Access</title>
+<style>
+body {
+	font-family: 'PT Sans', serif;
+}
+button {
+	font-family: 'PT Sans', serif;
+}
+button.big {
+	font-size: 120%;
+}
+select {
+	font-family: 'PT Sans', serif;
+}
+div.small {
+	font-size: 80%;
+}
+td.tc {
+	text-align: center;
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+tr.a {
+	background-color: #e0e0e0;
+}
+th {
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+textarea {
+    font-family: monospace;
+}
+input.param_v {
+	width: 50px;
+}
+input.param_s {
+	width: 400px;
+	height: 10px;
+	-webkit-appearance: none;
+	background-color: #f0f0f0;
+	-webkit-border-radius: 20px;
+}
+button.param_def {
+	width: 40px;
+}
+div#alg_name {
+	display: inline;
+	margin-left: 10px;
+}
+.lcd_text
+{
+	font-family:    monospace
+}
+</style>
+<script>
+function keyFunction(event) 
+{
+switch (event.keyCode)
+{
+case 49:  // 1 on number row
+{
+if (event.altKey)
+{
+getLine(1);
+}
+}
+break;
+
+case 50:  // 2 on number row
+{
+if (event.altKey)
+{
+getLine(2);
+}
+}
+break;
+
+case 51:  // 3 on number row
+{
+if (event.altKey)
+{
+getLine(3);
+}
+}
+break;
+
+case 52:  // 4 on number row
+{
+if (event.altKey)
+{
+getLine(4);
+}
+}
+break;
+
+case 53:  // 5 on number row
+{
+if (event.altKey)
+{
+	document.getElementById("info_alert").innerHTML = document.getElementById("active-config").textContent;
+}
+}
+break;
+
+case 54:  // 6 on number row
+{
+if (event.altKey)
+{
+	document.getElementById("info_alert").innerHTML = document.getElementById("active-preset").textContent;
+}
+}
+break;
+
+case 38:   // Up cursor = encoder anti-clockwise
+{
+if (event.altKey && event.shiftKey)
+{
+lastButton = controlEvents.encoderCCW;
+remote(controlEvents.encoderCCW);
+}
+}
+break;
+
+case 40:  // cursor down = encoder clockwise
+{
+if (event.altKey && event.shiftKey)
+{
+lastButton = controlEvents.encoderCW;
+remote(controlEvents.encoderCW);
+}
+}
+break;
+
+case 37:   // cursor left = left button press
+{
+if (event.altKey && event.shiftKey)
+{
+lastButton = controlEvents.leftButtonPress;
+remote(controlEvents.leftButtonPress);
+}
+}
+break;
+
+case 39:  // cursor right = press encoder
+{
+if (event.altKey && event.shiftKey)
+{
+lastButton = controlEvents.encoderPress;
+remote(controlEvents.encoderPress);
+}
+}
+break;
+
+case 76:  // l = long left button press
+{
+if (event.altKey)
+{
+lastButton = controlEvents.leftButtonLongPress;
+remote(controlEvents.leftButtonLongPress);
+}
+}
+break;
+
+default:
+{
+ // alert(event.keyCode);
+}
+break;
+} // end switch
+}
+
+function getCaretPosition(ctrl) 
+{
+    // IE < 9 Support 
+    if (document.selection) {
+        ctrl.focus();
+        var range = document.selection.createRange();
+        var rangelen = range.text.length;
+        range.moveStart('character', -ctrl.value.length);
+        var start = range.text.length - rangelen;
+        return {
+            'start': start,
+            'end': start + rangelen
+        };
+    } // IE >=9 and other browsers
+    else if (ctrl.selectionStart || ctrl.selectionStart == '0') {
+        return {
+            'start': ctrl.selectionStart,
+            'end': ctrl.selectionEnd
+        };
+    } else {
+        return {
+            'start': 0,
+            'end': 0
+        };
+    }
+}
+
+function setCaretPosition(ctrl, start, end) 
+{
+    // IE >= 9 and other browsers
+    if (ctrl.setSelectionRange) {
+        ctrl.focus();
+        ctrl.setSelectionRange(start, end);
+    }
+    // IE < 9 
+    else if (ctrl.createTextRange) {
+        var range = ctrl.createTextRange();
+        range.collapse(true);
+        range.moveEnd('character', end);
+        range.moveStart('character', start);
+        range.select();
+    }
+}
+
+function chunkSubstr(str, size) 
+{
+  const numChunks = Math.ceil(str.length / size);
+  const chunks = new Array(numChunks);
+
+  for (let i = 0, o = 0; i < numChunks; ++i, o += size) 
+{
+    chunks[i] = str.substr(o, size);
+  }
+
+  return chunks;
+}
+
+function nybbleChar( n )
+{
+	if ( n >= 10 ) {
+		return String.fromCharCode( 'A'.charCodeAt( 0 ) + n - 10 );
+	}
+	return String.fromCharCode( '0'.charCodeAt( 0 ) + n );
+}
+
+function dumpSysex( data, id, prefix ) 
+{
+	var len = data.length
+	var h = prefix
+	for ( var i = 0; i < len; ++i ) 
+{
+		var b = data[ i ];
+		h += nybbleChar( b >> 4 );
+		h += nybbleChar( b & 0xf );
+		h += " ";
+		if ( ( i & 0xf ) === 0xf ) 
+{
+			h += "\n";
+		}
+	} 
+	document.getElementById( id ).value = h;
+}
+
+function status( t ) 
+{
+    document.getElementById( "status" ).innerHTML = "Web MIDI status: " + t;
+}
+</script>
+</head>
+<body>
+<div class="small">
+At the time of writing this will work only in Google's <a href="http://www.google.com/chrome/">Chrome</a> browser or in the <a href="https://www.opera.com/">Opera</a> browser. Chrome may block SysEx access if you run this from a website, in which case download the html file locally and run it from there.
+</div>
+<div class="small" id="status" role="status">Web MIDI status: OK</div>
+<div class="small">
+This version is for disting EX firmware v1.12 and above.
+</div>
+<p>
+<label for="midiinput">MIDI input port: </label>
+<select id="midiinput" onchange="changeInput()" accesskey="i"></select>
+<label for="midioutput">MIDI output port: </label>
+<select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
+<br>
+</p><p>
+<h1>Display</h1>
+<div class="lcd_text" id="display1" > </div>
+<div class="lcd_text" id="display2" > </div>
+<div class="lcd_text" id="display3" > </div>
+<div class="lcd_text" id="display4" > </div>
+</p><p>
+<div class="lcd_text" id="active-config" role="status"> </div>
+<div class="lcd_text" id="active-preset" role="status" > </div>
+<h2>Keystrokes</h2>
+<ul>
+<li>Press Alt (Windows) or Option (Mac) + 1 through 4 to hear the contents of display lines 1 through 4.</li>
+<li>Press Alt (Windows) or Option (Mac) + 5 to hear the active configuration.</li>
+<li>Press Alt (Windows) or Option (Mac) + 6 to hear the active preset.</li>
+<li>Press Alt (Windows) or Option (Mac) + Shift + cursor up or cursor down to turn the encoder.</li>
+<li>Press Alt (Windows) or Option (Mac) + Shift + cursor right to press the encoder button.</li>
+<li>Press Alt (Windows) or Option (Mac) + Shift + cursor left to press the left button.</li>
+<li>Press Alt (Windows) or Option (Mac) + l to perform a long left button press.</li>
+</ul>
+<h1>Remote control</h1>
+<button onclick="remote(controlEvents.encoderPress)">Encoder push</button>
+<button onclick="remote(controlEvents.encoderCW)">Encoder CW</button>
+<button onclick="remote(controlEvents.encoderCCW)">Encoder CCW</button>
+<button onclick="remote(controlEvents.leftButtonPress)">Left button push</button>
+<button onclick="remote(controlEvents.leftButtonLongPress)">Left button long push</button>
+<button onclick="reqAllText()" accesskey="r">Refresh Display</button>
+<button onclick="reqParameterName();reqParameterValue()" accesskey="v">Refresh Parameter</button>
+<h1>Info</h1>
+<div class="small" id="info_alert" aria-live="polite" role="alert" aria-relevant="additions text" > </div>
+<div class="small" hidden="true" id="textInput">
+<h1>Text entry</h1>
+<label id="input_label" for="name_entry">Name entry:</label><input id='name_entry' accesskey='n' type='text' oninput='textEntryChanged()'>
+</div>
+<script>
+var midi, data;
+var parameterName = "";
+var lastButton = -1;
+var lastDisplayMode = -1;
+
+document.addEventListener("keydown", keyFunction);
+
+	const displayModes =
+	{
+        kDisplayModeNormal: 0,
+        kDisplayModeMenu: 1,
+        kDisplayModeMessage4x16: 2,
+        kDisplayModeDirContents: 3,
+        kDisplayModeTestInputs: 4,
+        kDisplayModeMIDIHistory: 5,
+        kDisplayModeTapTempo: 6,
+        kDisplayModeAutoCalibrate: 7,
+        kDisplayModeTuner: 8,
+        kDisplayModeEuclidean: 9,
+        kDisplayModeArpeggiator: 10,
+        kDisplayModeLFO: 11,
+        kDisplayModeEnvelope: 12,
+        kDisplayModeShell: 13,
+        kDisplayModeStats: 14,
+        kDisplayModeTempBigMessage: 15,
+    }
+
+const displayResponses =
+{
+	panelEvent: 0x70,
+	fullScreen: 0x72,
+	parameterName: 0x75,
+	parameterValue: 0x76,
+	presetName: 0x7A,
+}
+
+	const controlEvents =
+	{
+        encoderPress: 1,
+        encoderCW: 2,
+        encoderCCW: 3,
+        leftButtonPress: 4,
+        leftButtonLongPress: 5,
+        autoCalibrationComplete: 6,
+        presetLoaded: 7,
+        clockChanged: 9,
+    }
+
+function logKey(e) {
+  alert( e.code);
+}
+
+function onMIDISuccess(midiAccess) 
+{
+    status("OK");
+    midi = midiAccess;
+    midi.onstatechange = onStateChange;
+    onStateChange(null);
+}
+
+function onStateChange(e) {
+    var str = "";
+    let prevIn = document.getElementById( "midiinput" ).value;
+    let prevOut = document.getElementById( "midioutput" ).value;
+    let prevInOK = false;
+    let prevOutOK = false;
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
+	    if ( input.value.id == prevIn ) {
+		    prevInOK = true;
+	    }
+    }
+    document.getElementById( "midiinput" ).innerHTML = str;
+    if ( prevInOK ) {
+	    document.getElementById( "midiinput" ).value = prevIn;
+	}
+    str = "";
+    es9 = -1;
+    var outputs = midi.outputs.values();
+    for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
+	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
+	    if ( output.value.id == prevOut ) {
+		    prevOutOK = true;
+	    }
+    }
+    document.getElementById( "midioutput" ).innerHTML = str;
+    if ( prevOutOK ) {
+	    document.getElementById( "midioutput" ).value = prevOut;
+	}
+
+	changeInput();
+}
+
+function onMIDIFailure(e) 
+{
+    status("No access to MIDI devices or your browser doesn't support WebMIDI API.");
+}
+
+function changeInput() 
+{
+    var inputs = midi.inputs.values();
+    if ( inputs.size == 0 ) 
+{
+    	return;
+    }
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) 
+{
+    	input.value.onmidimessage = "";
+    }
+	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
+	input.onmidimessage = onMIDIMessage;
+
+	reqAllText();   // Initialise the display and parameter divs with display data
+	reqPresetName();  // Populaate the div for the active preset
+}
+
+function changeOutput() {
+	reqAllText();   // Initialise the display and parameter divs with display data
+	reqPresetName();  // Populaate the div for the active preset
+}
+
+function parseDisplayResponse( data ) 
+{
+	let displayMode = data[6];
+	let lines = [ "", "", "", "" ];	
+	let c = 7;
+	
+	for ( let y=0; y<4; ++y )
+	{
+        let displayText = "";
+				for ( let x=0; x<32; ++x )
+		{
+			let n = data[c++];
+			if ( n == 0 ) 
+			{
+				displayText += " ";
+			}
+			else
+			{
+				displayText += String.fromCharCode( n );
+			}
+		}
+		displayText = displayText.replace( "<", "&lt;" ).replace( ">", "&gt;" );
+		lines[y] = displayText;
+	}
+
+    document.getElementById("display1").innerHTML = lines[0];
+		document.getElementById("display2").innerHTML = lines[1];
+		document.getElementById("display3").innerHTML = lines[2];
+		document.getElementById("display4").innerHTML = lines[3];
+		document.getElementById("display1").focus();
+
+	// Try and announce an appropriate display title
+ sayDisplayState( displayMode, lastButton);
+}
+
+	function refreshTuner() {
+if (document.getElementById("display1").textContent.substr(0,5) == "Tuner")
+{
+		reqParameterValue();
+}
+	}
+
+	function parseButtonPress( data ) 
+{
+    let buttonEvent = data[6];
+    let displayMode = data[7];
+	lastButton = buttonEvent;
+    lastDisplayMode = displayMode;
+
+    if ( displayMode == displayModes.kDisplayModeTuner )
+	{
+		reqParameterName();
+tunerID = setInterval(function(){ refreshTuner(); }, 1000);
+    	return;
+		}
+else
+{
+clearInterval(tunerID);
+}
+
+	switch (buttonEvent)   // What kind of button event
+	{
+		case controlEvents.encoderPress:  
+		{
+			setTimeout( reqAllText, 100 );
+		}
+		break;
+
+		case controlEvents.encoderCW: 
+		case controlEvents.encoderCCW:
+		{
+			setTimeout( reqAllText, 100 );
+		}
+		break;
+
+		case controlEvents.leftButtonPress:
+		{
+			setTimeout( reqAllText, 100 );
+		}
+		break;
+
+		case controlEvents.leftButtonLongPress:
+		{
+			setTimeout( reqAllText, 100 );
+		}
+		break;
+		
+		case controlEvents.autoCalibrationComplete:
+		{
+			document.getElementById("display3").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject";
+			document.getElementById("info_alert").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject, but remember to unplug your V C O first";
+		}
+		break;
+		
+		case controlEvents.presetLoaded:
+		{
+			document.getElementById("info_alert").innerHTML = "Preset loaded";
+			reqPresetName();
+		}
+		break;
+		
+		case controlEvents.clockChanged:
+		{
+			document.getElementById("info_alert").innerHTML = getClockType();
+			setTimeout( reqClockInfo, 100 );
+		}
+		break;
+
+		default:
+		{
+			// alert( data[6] );
+		}
+		break;
+	} // end switch
+}
+
+function onMIDIMessage(message) 
+{
+    data = message.data;
+    let header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D ];
+
+    for ( let i=0; i<5; ++i )
+	{
+    	if ( header[i] != data[i] ) 
+		{
+    		return;
+    	}
+    }
+
+	switch (data[5])
+{
+	case displayResponses.panelEvent:    		// Button event
+	{
+		parseButtonPress( data );
+	}
+	break;
+
+	case displayResponses.fullScreen:     		// Full ScreenReply
+	{
+		parseDisplayResponse( data );
+	}
+	break;
+
+	case displayResponses.parameterName:    		// Parameter name
+	{
+	    let str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+		parameterName = str;
+	    // document.getElementById( "info_alert" ).innerHTML = str;
+	}
+	break;
+
+	case displayResponses.parameterValue:
+	{
+	if (parameterName != "Sorry")
+	{
+		value = String.fromCharCode.apply( null, data.slice( 7, -1 ) );
+		value = value.replace( "<", "&lt;" ).replace( ">", "&gt;" );
+		let isName = data[6];
+	    let str = parameterName + ": " + value;
+
+		if (isName)  // Show a textarea so that the user can edit the name
+		{
+			value = value.split('\001')[0];
+			document.getElementById("name_entry").value = value;
+		}
+		else if (parameterName == "Tuner") {
+            if (value == "Out of range") {
+                document.getElementById("info_alert").innerHTML = value;
+			}
+			else {
+let noteName = getNoteName(value);
+				document.getElementById("display1").innerHTML = parameterName + " - remember to unplug your V C O from X or Y before pressing the Encoder or the Left button to quit";
+				document.getElementById("display2").innerHTML = noteName;
+				document.getElementById("display3").innerHTML = getTuningError(value);
+				document.getElementById("display4").innerHTML = getDetectedFrequency(value);
+                
+if (document.getElementById("info_alert").textContent == noteName)
+{  // Note name is stable, so just announce the tuning error
+document.getElementById("info_alert").innerHTML = noteName + " " + getTuningError(value);
+}
+else
+{  // Announce the new note name
+document.getElementById("info_alert").innerHTML = noteName;
+}
+			}
+}
+else if (parameterName == "GO!")
+{
+str = parameterName + ": Press the Encoder to start auto calibration for " + document.getElementById("display1").textContent;
+	    	document.getElementById( "info_alert" ).innerHTML = str;
+}
+		else
+{
+	    	document.getElementById( "info_alert" ).innerHTML = str;
+}
+}
+		}  // parameterName != "Sorry"
+	break;
+	
+	case displayResponses.autoCalibrationComplete:
+	{
+			document.getElementById("display3").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject";
+			document.getElementById("info_alert").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject, but remember to unplug your V C O first";
+	    	}
+    break;
+	
+	case displayResponses.presetName:
+	{
+	    let str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+	    // console.log( str );
+	    	document.getElementById( "active-preset" ).innerHTML = "Active preset: " + str;
+	}
+    break;
+	
+	case displayResponses.clockInfo:
+	{
+		let itempo = ( data[6] << 0 ) | ( data[7] << 7 ) | ( data[8] << 14 ) | ( data[9] << 21 ) | ( data[10] << 28 );
+		let running = data[11];
+		let clocking = data[12];
+		let buffer = new ArrayBuffer(4);
+		let f32 = new Float32Array(buffer);
+		let ui8 = new Uint8Array(buffer);
+		ui8[0] = ( itempo >> 0 ) & 0xff;
+		ui8[1] = ( itempo >> 8 ) & 0xff;
+		ui8[2] = ( itempo >> 16 ) & 0xff;
+		ui8[3] = ( itempo >> 24 ) & 0xff;
+		let tempo = f32[0];
+		let clockRunning = [ "None", "DIN", "USB A", "USB C", "Int", "Ext" ][ running ];
+		let clockSourceNotRunning = "";
+		if ( clocking & (1<<0) ) {
+			clockSourceNotRunning += "D";
+		}
+		if ( clocking & (1<<1) ) {
+			clockSourceNotRunning += "A";
+		}
+		if ( clocking & (1<<2) ) {
+			clockSourceNotRunning += "C";
+		}
+	    // console.log( tempo, clockRunning, clockSourceNotRunning );
+//	    	document.getElementById( "info_alert" ).innerHTML = tempo + " " + clockRunning + " " + clockSourceNotRunning;
+	    	document.getElementById( "info_alert" ).innerHTML = getClockInfo();
+	}
+    break;
+}  // end switch
+}
+
+function textEntryChanged()
+{
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x47 ];
+	let name = document.getElementById( "name_entry" ).value;
+	for ( let i = 0; i < name.length; ++i ) {
+		arr[6+i] = name.charCodeAt( i );
+	}
+	arr.push( 0xF7 );
+	output.send( arr );
+}
+
+function remote( event )
+{
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x48, event, 0xF7 ];
+	output.send( arr );
+reqAllText();
+}
+
+function send() 
+{
+	var str = makeSysEx();
+	var arr = new Uint8Array( str.length );
+	for ( var i=0; i<str.length; ++i ) 
+{
+		arr[i] = str.charCodeAt( i );
+	}
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	output.send( arr );
+}
+
+function getTempo()
+{
+var strTempo = document.getElementById("display2").textContent;
+let bpmPos = strTempo.indexOf( "bpm");
+let tempoPos = strTempo.lastIndexOf( " ", bpmPos);
+return strTempo.substr(tempoPos, (bpmPos - tempoPos));
+}
+
+function getClockType()
+{
+var strClockType = document.getElementById("display1").textContent;
+return strClockType.substr( strClockType.indexOf( "Clk:"));
+}
+
+function getClockInfo()
+{
+return getClockType() + " - " + getTempo();
+}
+
+function getNoteName(str)
+{
+var noteName = "";
+
+    if (document.getElementById("display1").innerHTML.substr( 0, 7) == "Tuner -")
+	{
+noteName = str.substr(0, 1);
+
+if (str.substr( 1, 1) == "b")
+{
+noteName += " flat ";
+noteName += str.substr(3,1);  // Octave number follows a space
+}
+else if (str.substr(1, 1) == "#")
+{
+noteName += " sharp ";
+noteName += str.substr(3,1);  // Octave number follows a space
+}
+else
+{
+noteName += str.substr(2,1);  // Octave number follows a space
+}
+}
+return noteName;
+}
+
+function getTuningError(str)
+{
+var tuningError = "";
+var centsPos = str.indexOf(" cents");
+
+if (centsPos != -1)
+{
+tuningError = str.substr( 0, centsPos);
+tuningError = tuningError.substr( tuningError.lastIndexOf(" ")) + " cents"; 
+}
+return tuningError;
+}
+
+function getDetectedFrequency(str)
+{
+var detectedFreq = "";
+var hertzPos = str.indexOf("Hz");
+
+if (hertzPos != -1)
+{
+detectedFreq = str.substr( str.lastIndexOf(" ")); 
+}
+return detectedFreq;
+}
+
+function sayDisplayState( displayMode, messageID)
+{
+		switch (displayMode)
+	{
+		case displayModes.kDisplayModeNormal:
+			{
+switch (messageID)
+{
+case -1:
+{
+	return;
+}
+break;
+
+case controlEvents.leftButtonPress:  
+{
+document.getElementById("info_alert").innerHTML = getClockType();
+}
+break;
+
+case controlEvents.leftButtonLongPress:
+{
+	var str = "Overview - " + getClockInfo();
+document.getElementById("info_alert").innerHTML = str;
+}
+break;
+
+case controlEvents.encoderCCW:
+case controlEvents.encoderCW:
+{
+	document.getElementById("info_alert").innerHTML = getTempo();
+}
+break;
+
+default:
+{
+	document.getElementById("info_alert").innerHTML = getClockType();
+}
+break;
+}  // end messageID switch
+}
+			break;
+
+		case displayModes.kDisplayModeMenu:
+			{
+var line3 = document.getElementById("display3").textContent.trim();
+
+if (line3 != "")
+{
+	document.getElementById("info_alert").innerHTML = "";
+	document.getElementById("info_alert").innerHTML = line3;
+}
+else
+{
+                // document.getElementById("info_alert").innerHTML = "unidentified Menu option";
+}
+
+let display1 = document.getElementById("display1").textContent;
+if (display1.substr( 0, 5) == "Name " || display1.substr( 0, 15) == "USB Device Name")
+{
+document.getElementById( "input_label" ).innerHTML = document.getElementById("display1").textContent + ": ";
+document.getElementById("textInput").hidden = false;
+document.getElementById("name_entry").focus();
+setCaretPosition( document.getElementById("name_entry"), 0, 0); 
+}
+else
+{
+document.getElementById("textInput").hidden = true;
+}
+}
+			break;
+
+case displayModes.kDisplayModeMessage4x16:
+			{
+if (document.getElementById("display1").textContent.substr(0,11) == "Calibration")
+{
+	document.getElementById("info_alert").innerHTML = "Calibration discarded. Press the Encoder to enter the menu or the Left button to return to Overview mode";
+}
+else
+{
+	document.getElementById("info_alert").innerHTML = "Message4x16";
+}
+            }
+			break;
+
+case displayModes.kDisplayModeDirContents:
+			{
+	document.getElementById("info_alert").innerHTML = "Directory contents";
+            }
+			break;
+
+case displayModes.kDisplayModeTestInputs:
+			{
+	document.getElementById("info_alert").innerHTML = "Test inputs. This is graphical and not accessible, so press the Left button to exit";
+            }
+			break;
+
+case displayModes.kDisplayModeMIDIHistory:
+			{
+	document.getElementById("info_alert").innerHTML = "MIDI history. This is not scrollable - press the left button to exit";
+            }
+			break;
+
+case displayModes.kDisplayModeTapTempo:
+			{
+	document.getElementById("info_alert").innerHTML = "Tap tempo";
+            }
+			break;
+
+case displayModes.kDisplayModeAutoCalibrate:
+			{
+				document.getElementById("display1").innerHTML = "Auto Calibration complete - remember to unplug your V C O from X or Y before pressing the Encoder to Accept or the Left button to Reject the calibration";
+	document.getElementById("info_alert").innerHTML = "Auto Calibration complete - remember to unplug your V C O from X or Y before pressing the Encoder to Accept or the Left button to Reject the calibration";
+            }
+			break;
+
+case displayModes.kDisplayModeTuner:
+				{
+                    }
+			break;
+
+case displayModes.kDisplayModeEuclidean:
+			{
+	document.getElementById("info_alert").innerHTML = "Euclidean";
+            }
+			break;
+
+case displayModes.kDisplayModeArpeggiator:
+			{
+	document.getElementById("info_alert").innerHTML = "Arpeggiator";
+            }
+			break;
+
+case displayModes.kDisplayModeLFO:
+			{
+	document.getElementById("info_alert").innerHTML = "LFO";
+            }
+			break;
+
+case displayModes.kDisplayModeEnvelope:
+			{
+	document.getElementById("info_alert").innerHTML = "Envelope";
+            }
+			break;
+
+case displayModes.kDisplayModeShell:
+			{
+	document.getElementById("info_alert").innerHTML = "shell";
+            }
+			break;
+
+case displayModes.kDisplayModeStats:
+			{
+	document.getElementById("info_alert").innerHTML = "Stats";
+            }
+			break;
+
+case displayModes.kDisplayModeTempBigMessage:
+			{
+	document.getElementById("info_alert").innerHTML = "Temp big message";
+            }
+			break;
+
+default:
+{
+	document.getElementById("info_alert").innerHTML = "Unknown display mode";
+}
+break;
+}  // end switch
+	reqParameterName();
+reqParameterValue();
+}
+
+function getLine(lineNumber)
+{
+	var id = "display" + lineNumber;
+	var element = document.getElementById(id);
+	// Need to send a space before any text to ensure that the screen reader always announces, even if the text being sent is the same as the previous content
+	document.getElementById("info_alert").innerHTML = element.textContent;
+}
+
+function reqAllText() 
+{
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x71, 0xF7 ];
+	output.send( arr );
+}
+
+function reqParameterName() 
+{
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x73, 0xF7 ];
+	output.send( arr );
+}
+
+function reqParameterValue() 
+{
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x74, 0xF7 ];
+	output.send( arr );
+}
+
+function reqPresetName()
+{
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x7A, 0xF7 ];
+	output.send( arr );
+}
+
+// global code
+var tunerID = -1;
+if ( navigator.requestMIDIAccess ) 
+{
+    navigator.requestMIDIAccess ( 
+{
+        sysex: true
+    } ).then(onMIDISuccess, onMIDIFailure);
+} 
+else 
+{
+    status("No MIDI support in your browser.");
+}
+</script>
+</body>
+</html>
