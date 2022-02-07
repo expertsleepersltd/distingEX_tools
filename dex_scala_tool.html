@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<head>
+
+<title>disting EX Scala Tool</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans">
+
+<style>
+body {
+	font-family: 'PT Sans', serif;
+}
+button {
+	font-family: 'PT Sans', serif;
+}
+button.big {
+	font-size: 120%;
+}
+select {
+	font-family: 'PT Sans', serif;
+}
+div.small {
+	font-size: 80%;
+}
+td.tc {
+	text-align: center;
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+tr.a {
+	background-color: #e0e0e0;
+}
+th {
+	background-color: #c0c0c0;
+	font-size: 80%;
+}
+textarea {
+    font-family: monospace;
+}
+</style>
+
+<script>
+function log( t ) {
+	var ta = document.getElementById( "log" );
+	var d = new Date();
+	var dd = d.toLocaleTimeString();
+	ta.value = ta.value + "\n" + dd + ": " + t;
+	ta.scrollTop = ta.scrollHeight;
+	return dd;
+}
+function status( t ) {
+    document.getElementById( "status" ).innerHTML = "Web MIDI status: " + t;
+}
+function nybbleChar( n ) {
+	if ( n >= 10 ) {
+		return String.fromCharCode( 'A'.charCodeAt( 0 ) + n - 10 );
+	}
+	return String.fromCharCode( '0'.charCodeAt( 0 ) + n );
+}
+function makeMsgSysEx() {
+	var d = [0xF0, 0x00, 0x21, 0x27, 0x2F, 0x02]
+	var len = d.length
+	var str = ""
+	for ( var i = 0; i < len; ++i ) {
+		str += String.fromCharCode( d[i] );
+	} 
+	var text = "Hello!\nThis message\nwas sent from\nthe config tool.";
+	str += text;
+	str += String.fromCharCode( 0xF7 );
+	return str;
+}
+function dumpSysex( data, id, prefix ) {
+	var len = data.length
+	var h = prefix
+	for ( var i = 0; i < len; ++i ) {
+		var b = data[ i ];
+		h += nybbleChar( b >> 4 );
+		h += nybbleChar( b & 0xf );
+		h += " ";
+		if ( ( i & 0xf ) === 0xf ) {
+			h += "\n";
+		}
+	} 
+	document.getElementById( id ).value = h;
+}
+</script>
+
+</head>
+
+<body>
+
+<div class="small">
+At the time of writing this will work only in Google's <a href="http://www.google.com/chrome/">Chrome</a> browser. Chrome may block SysEx access if you run this from a website, in which case download the html file locally and run it from there.
+</div>
+<div class="small" id="status"></div>
+<p>
+
+Send to MIDI port: <select id="midioutput"></select>
+Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+<p>
+<textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
+<textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
+<textarea rows=5 cols=45 name="text" id="rxSysex"></textarea>
+<p>
+<table>
+<tr>
+<td>
+<input type="file" id="uploadScl" name="files[]" single />
+<br>
+<button class="big" onclick="installScl()">Send .scl</button>
+<!--
+to slot <select id="whichScl">
+<script>
+	for ( var i=1; i<=32; ++i ) {
+		document.write( "<option value='"+i+"'>" + i + "</option>" );
+	}
+</script>
+</select>
+-->
+</td>
+<td>
+<input type="file" id="uploadKbm" name="files[]" single />
+<br>
+<button class="big" onclick="installKbm()">Send .kbm</button>
+<!--
+to slot <select id="whichKbm">
+<script>
+	for ( var i=1; i<=32; ++i ) {
+		document.write( "<option value='"+i+"'>" + i + "</option>" );
+	}
+</script>
+-->
+</select>
+</td>
+</tr>
+
+<tr>
+<td><textarea rows=50 cols=70 id="txScl"></textarea></td>
+<td><textarea rows=50 cols=70 id="txKbm"></textarea></td>
+</tr>
+</table>
+<p>
+
+<script>
+  function handleFileSelect(evt,id) {
+    var files = evt.target.files; // FileList object
+    var f = files[0];
+
+    var reader = new FileReader();
+
+	reader.onload = (function(theFile) {
+        return function(e) {
+			ta = document.getElementById( id );
+			ta.value = e.target.result;
+        };
+      })(f);
+      
+    reader.readAsText( f );
+  }
+  function handleSclFileSelect(evt) {
+  	handleFileSelect( evt, "txScl" );
+  }
+  function handleKbmFileSelect(evt) {
+  	handleFileSelect( evt, "txKbm" );
+  }
+
+  document.getElementById('uploadScl').addEventListener('change', handleSclFileSelect, false);
+  document.getElementById('uploadKbm').addEventListener('change', handleKbmFileSelect, false);
+</script>
+
+<script>
+var midi, data;
+if ( navigator.requestMIDIAccess ) {
+    navigator.requestMIDIAccess ( {
+        sysex: true
+    } ).then(onMIDISuccess, onMIDIFailure);
+} else {
+    status("No MIDI support in your browser.");
+}
+function onMIDISuccess(midiAccess) {
+	log( "midi access granted" );
+    status("OK");
+    midi = midiAccess;
+    midi.onstatechange = onStateChange;
+    onStateChange(null);
+}
+function onStateChange(e) {
+    var str = "";
+    let prevIn = document.getElementById( "midiinput" ).value;
+    let prevOut = document.getElementById( "midioutput" ).value;
+    let prevInOK = false;
+    let prevOutOK = false;
+    var inputs = midi.inputs.values();
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
+	    if ( input.value.id == prevIn ) {
+		    prevInOK = true;
+	    }
+    }
+    document.getElementById( "midiinput" ).innerHTML = str;
+    if ( prevInOK ) {
+	    document.getElementById( "midiinput" ).value = prevIn;
+	}
+    str = "";
+    es9 = -1;
+    var outputs = midi.outputs.values();
+    for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
+	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
+	    if ( output.value.id == prevOut ) {
+		    prevOutOK = true;
+	    }
+    }
+    document.getElementById( "midioutput" ).innerHTML = str;
+    if ( prevOutOK ) {
+	    document.getElementById( "midioutput" ).value = prevOut;
+	}
+
+	changeInput();
+}
+function onMIDIFailure(e) {
+	log( "midi access failure" );
+    status("No access to MIDI devices or your browser doesn't support WebMIDI API.");
+}
+function changeInput() {
+    var inputs = midi.inputs.values();
+    if ( inputs.size == 0 ) {
+    	return;
+    }
+    for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
+    	input.value.onmidimessage = "";
+    }
+	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
+	input.onmidimessage = onMIDIMessage;
+}
+function onMIDIMessage(message) {
+    data = message.data;
+    var header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D ];
+    for ( var i=0; i<5; ++i ) {
+    	if ( header[i] != data[i] ) {
+    		return;
+    	}
+    }
+	let dd = log( "received sysex (" + data.length + " bytes)" );
+	let dump = true;
+	if ( data[5] == 0x32 ) {
+		// message
+	    var str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+		document.getElementById( "rxSysex" ).value = dd + ( "\n-----\n" + str );
+		dump = false;
+	}
+	if ( dump ) {
+		dumpSysex( data, "rxSysex", dd+"\n" );
+	}
+}
+function makeSclSysEx() {
+	let which = 0;//document.getElementById( "whichScl" ).value;
+	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x11, which];
+	let len = d.length;
+	let str = "";
+	for ( let i = 0; i < len; ++i ) {
+		str += String.fromCharCode( d[i] );
+	} 
+
+	let text = document.getElementById( "txScl" ).value;
+	str += text;
+	str += String.fromCharCode( 0xF7 );
+	return str;
+}
+function makeKbmSysEx() {
+	let which = 0;//document.getElementById( "whichKbm" ).value;
+	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x12, which];
+	let len = d.length;
+	let str = "";
+	for ( let i = 0; i < len; ++i ) {
+		str += String.fromCharCode( d[i] );
+	} 
+
+	let text = document.getElementById( "txKbm" ).value;
+	str += text;
+	str += String.fromCharCode( 0xF7 );
+	return str;
+}
+function installScl() {
+	var str = makeSclSysEx();
+	var arr = new Uint8Array( str.length );
+	for ( var i=0; i<str.length; ++i ) {
+		arr[i] = str.charCodeAt( i );
+	}
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	output.send( arr );
+	var dd = log( "sent sysex (" + str.length + " bytes)" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function installKbm() {
+	var str = makeKbmSysEx();
+	var arr = new Uint8Array( str.length );
+	for ( var i=0; i<str.length; ++i ) {
+		arr[i] = str.charCodeAt( i );
+	}
+	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	output.send( arr );
+	var dd = log( "sent sysex (" + str.length + " bytes)" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
+</script>
+
+</body>
