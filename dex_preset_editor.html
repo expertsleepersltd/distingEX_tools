@@ -52,6 +52,9 @@ div#alg_name {
 	display: inline;
 	margin-left: 10px;
 }
+div.pv_string {
+	display: inline;
+}
 .hidden {
 	position:absolute;
 	left:-10000px;
@@ -81,7 +84,7 @@ function nybbleChar( n ) {
 	return String.fromCharCode( '0'.charCodeAt( 0 ) + n );
 }
 function makeMsgSysEx() {
-	var d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x02]
+	var d = [0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x02]
 	var len = d.length
 	var str = ""
 	for ( var i = 0; i < len; ++i ) {
@@ -122,6 +125,13 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 <button class="big"  accesskey="r" onclick="request()">Refresh</button>
 Send to MIDI output port: <select id="midioutput"  accesskey="o"></select>
 Listen on MIDI input port: <select id="midiinput"  accesskey="i" onchange='changeInput()'></select>
+SysEx ID: <select id="sysExId" onchange='changeSysExId()'>
+<script>
+for ( let i=0; i<127; ++i ) {
+	document.write( "<option value=" + i + ">" + i + "</option>" );
+}
+</script>
+</select>
 <p>
 <label class="hidden" for="log">Log:</label><textarea rows=5 cols=50 id="log" accesskey="l" class="log" readOnly></textarea>
 <label class="hidden" for="txSysex">SysEx sent:</label><textarea rows=5 cols=45 name="text" id="txSysex" accesskey="y"></textarea>
@@ -300,6 +310,9 @@ function processMapping( data ) {
 		let flags = data[c]; c++;
 		let min = extractShort( data.slice( c, c+3 ) ); c += 3;
 		let max = extractShort( data.slice( c, c+3 ) ); c += 3;
+		if ( flags & 4 ) {
+			cc = 128;
+		}
 		document.getElementById( "p" + i + "_midi_cc" ).value = cc;
 		document.getElementById( "p" + i + "_midi_en" ).checked = flags & 1;
 		document.getElementById( "p" + i + "_midi_sym" ).checked = flags & 2;
@@ -324,7 +337,7 @@ nextParameterToGet = 0;
 numParametersToGet = 0;
 function getNextParameter() {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x43, nextParameterToGet, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x43, nextParameterToGet, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent parameter info request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -361,6 +374,7 @@ function processNumParameters( num ) {
 		str += "<input id=p" + i + "_s type='range' min='-32768' max='32767' class='param_s' onInput='param_slider(" + i + ")' ondblclick='param_def(" + i + ")'" + focus + ">";
 		str += "<select id=p" + i + "_e class='param_e' onchange='param_enum(" + i + ")' style='display:none;'" + focus + "></select>";
 		str += "<input id=p" + i + "_c type='checkbox' class='param_c' onchange='param_check(" + i + ")' style='display:none;'" + focus + ">";
+		str += "<div class='pv_string' id=p" + i + "_pv></div>";
 		str += "</td>";
 
 		if ( i < 64 ) {
@@ -378,7 +392,11 @@ function processNumParameters( num ) {
 			str += "<td class='map_button'><select id=p" + i + "_button_button onchange='mapping_button_button(" + i + ")'><option value=0>---</option><option value=1>Left</option><option value=2>Right</option></select></td>";
 			str += "<td class='map_button'><input id=p" + i + "_button_offset type='number' class='param_v' size=7 min='-32768' max='32767' onchange='mapping_button_offset(" + i + ")'></td>";
 
-			str += "<td class='map_midi'><input id=p" + i + "_midi_cc type='number' class='param_v' size=3 min='0' max='127' onchange='mapping_midi_cc(" + i + ")'></td>";
+			str += "<td class='map_midi'><select id=p" + i + "_midi_cc class='param_v' onchange='mapping_midi_cc(" + i + ")'>";
+			for ( let j=0; j<128; ++j ) {
+				str += "<option value=" + j + ">" + j + "</option>";
+			}
+			str += "<option value=128>Aftertouch</option></select></td>";
 			str += "<td class='map_midi'><input id=p" + i + "_midi_en type='checkbox' class='param_c' onchange='mapping_midi_en(" + i + ")'></td>";
 			str += "<td class='map_midi'><input id=p" + i + "_midi_sym type='checkbox' class='param_c' onchange='mapping_midi_sym(" + i + ")'></td>";
 			str += "<td class='map_midi'><input id=p" + i + "_midi_min type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_midi_min(" + i + ")'></td>";
@@ -400,7 +418,7 @@ function processNumParameters( num ) {
 	setTimeout( getNextParameter, 20 );
 
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x44, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x44, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent parameter values request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -414,7 +432,7 @@ function processNumParameters( num ) {
 
 function requestMapping() {
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4B, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4B, 0xF7 ];
 	output.send( arr );
 	let dd = log( "sent mapping request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -446,7 +464,7 @@ function processParameterInfo( data ) {
 	var unitStr = "";
 	if ( unit == 1 ) {
 		var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x49, p, 0xF7 ];
+		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x49, p, 0xF7 ];
 		output.send( arr );
 		var dd = log( "sent enum string request to disting EX" );
 		dumpSysex( arr, "txSysex", dd+"\n" );
@@ -455,6 +473,9 @@ function processParameterInfo( data ) {
 		var v = document.getElementById( "p" + p + "_s" ).value;
 		e.checked = v != 0;
 		e.style = 'display:inline;';
+	} else if ( unit == 19 ) {
+		unitStr = "<br>";
+		setTimeout( requestParameterValueString, 1000, p );
 	} else if ( unit > 0 && (unit-1) < unitStrings.length ) {
 		unitStr = unitStrings[ unit-1 ];
 	}
@@ -488,17 +509,38 @@ function processParameterValue( data ) {
     document.getElementById( "p" + p + "_c" ).checked = v;
 }
 
+function processParameterValueString( data ) {
+	let p = data[0];
+	let name = "";
+	for ( let i = 0; i < 22; ++i ) {
+		let n = data[1+i];
+		if ( n == 0 ) {
+			break;
+		}
+		name += String.fromCharCode( n );
+	}
+    document.getElementById( "p" + p + "_pv" ).innerHTML = name;
+}
+
 function requestParameterValue( p ) {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x45, p, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x45, p, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent parameter value request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
 
+function requestParameterValueString( p ) {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x50, p, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent parameter value string request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+
 function send_preset_name() {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x47 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x47 ];
 	var name = document.getElementById( "preset_name" ).value;
 	name += "                ";
 	name = name.substring( 0, 16 );
@@ -513,7 +555,7 @@ function send_preset_name() {
 
 function send_mapping_name() {
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4C ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4C ];
 	let name = document.getElementById( "mapping_name" ).value;
 	name += "                ";
 	name = name.substring( 0, 16 );
@@ -528,11 +570,15 @@ function send_mapping_name() {
 
 function sendSetValue( p, v ) {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x46, p, (v>>14)&3, (v>>7)&0x7f, v&0x7f, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x46, p, (v>>14)&3, (v>>7)&0x7f, v&0x7f, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent parameter update to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
-	setTimeout( requestParameterValue( p ), 5 );
+	setTimeout( requestParameterValue, 5, p );
+	let unitStr = document.getElementById( "p" + p + "_unit" ).innerHTML;
+	if ( unitStr == "<br>" ) {
+		setTimeout( requestParameterValueString, 10, p );
+	}
 }
 
 function param_def( p ) {
@@ -563,7 +609,7 @@ function param_text( p ) {
 function param_focus( p ) {
 	if ( document.getElementById( 'auto_focus' ).checked ) {
 		var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4A, p, 0xF7 ];
+		var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4A, p, 0xF7 ];
 		output.send( arr );
 		var dd = log( "sent focus update to disting EX" );
 		dumpSysex( arr, "txSysex", dd+"\n" );
@@ -595,7 +641,7 @@ function mapping_send( p ) {
 	let buttonOffset = document.getElementById( "p" + p + "_button_offset" ).value;
 
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4D, p, input, flags&0x3f, (flags>>6)&3, (scale>>14)&3, (scale>>7)&0x7f, scale&0x7f, (knobOffset>>14)&3, (knobOffset>>7)&0x7f, knobOffset&0x7f, (knobScale>>14)&3, (knobScale>>7)&0x7f, knobScale&0x7f, (buttonOffset>>14)&3, (buttonOffset>>7)&0x7f, buttonOffset&0x7f, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4D, p, input, flags&0x3f, (flags>>6)&3, (scale>>14)&3, (scale>>7)&0x7f, scale&0x7f, (knobOffset>>14)&3, (knobOffset>>7)&0x7f, knobOffset&0x7f, (knobScale>>14)&3, (knobScale>>7)&0x7f, knobScale&0x7f, (buttonOffset>>14)&3, (buttonOffset>>7)&0x7f, buttonOffset&0x7f, 0xF7 ];
 	output.send( arr );
 	let dd = log( "sent midi mapping update to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -665,9 +711,14 @@ function mapping_midi( p ) {
 	let flags = en | ( sym << 1 );
 	let min = document.getElementById( "p" + p + "_midi_min" ).value;
 	let max = document.getElementById( "p" + p + "_midi_max" ).value;
+	
+	if ( cc == 128 ) {
+		cc = 0;
+		flags |= (1<<2);
+	}
 
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4E, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4E, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
 	output.send( arr );
 	let dd = log( "sent midi mapping update to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -698,7 +749,7 @@ function mapping_i2c( p ) {
 	let max = document.getElementById( "p" + p + "_i2c_max" ).value;
 
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x4F, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4F, p, cc, flags, (min>>14)&3, (min>>7)&0x7f, min&0x7f, (max>>14)&3, (max>>7)&0x7f, max&0x7f, 0xF7 ];
 	output.send( arr );
 	let dd = log( "sent midi mapping update to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -776,51 +827,56 @@ function changeInput() {
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
 }
+function changeSysExId() {
+	sysExId = document.getElementById( "sysExId" ).value;
+}
 function onMIDIMessage(message) {
     data = message.data;
-    var header = [ 240, 0, 33, 39, 0x5D ];
-    for ( var i=0; i<5; ++i ) {
+    var header = [ 240, 0, 33, 39, 0x5D, sysExId ];
+    for ( var i=0; i<6; ++i ) {
     	if ( header[i] != data[i] ) {
     		return;
     	}
     }
 	var dd = log( "received sysex (" + data.length + " bytes)" );
 	dumpSysex( data, "rxSysex", dd+"\n" );
-	if ( data[5] == 0x40 ) {
-		processAlgorithm( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x41 ) {
-		processPresetName( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x42 ) {
-		processNumParameters( data[6] );
-	} else if ( data[5] == 0x43 ) {
-		processParameterInfo( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x44 ) {
-		processAllParameterValues( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x45 ) {
-		processParameterValue( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x48 ) {
-		processUnitStrings( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x49 ) {
-		processEnumStrings( data.slice( 6, -1 ) );
-	} else if ( data[5] == 0x4B ) {
-		processMapping( data.slice( 6, -1 ) );
+	if ( data[6] == 0x40 ) {
+		processAlgorithm( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x41 ) {
+		processPresetName( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x42 ) {
+		processNumParameters( data[7] );
+	} else if ( data[6] == 0x43 ) {
+		processParameterInfo( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x44 ) {
+		processAllParameterValues( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x45 ) {
+		processParameterValue( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x48 ) {
+		processUnitStrings( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x49 ) {
+		processEnumStrings( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x4B ) {
+		processMapping( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x50 ) {
+		processParameterValueString( data.slice( 7, -1 ) );
 	}
 }
 function request() {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x40, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x40, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent algorithm request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x41, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x41, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent preset name request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x48, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x48, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent unit strings request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x42, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x42, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent num parameters request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -837,6 +893,8 @@ function sendMsg() {
 	var dd = log( "sent sysex (" + str.length + " bytes)" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
+
+var sysExId = 0;
 
 </script>
 

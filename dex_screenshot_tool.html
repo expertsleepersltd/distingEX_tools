@@ -97,6 +97,13 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 <button class="big" onclick="request()">Take Screenshot</button>
 Send to MIDI port: <select id="midioutput"></select>
 Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+SysEx ID: <select id="sysExId" onchange='changeSysExId()'>
+<script>
+for ( let i=0; i<127; ++i ) {
+	document.write( "<option value=" + i + ">" + i + "</option>" );
+}
+</script>
+</select>
 <p>
 <textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
 <textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
@@ -195,23 +202,26 @@ function changeInput() {
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
 }
+function changeSysExId() {
+	sysExId = document.getElementById( "sysExId" ).value;
+}
 function onMIDIMessage(message) {
     data = message.data;
-    var header = [ 240, 0, 33, 39, 0x5D ];
-    for ( var i=0; i<5; ++i ) {
+    var header = [ 240, 0, 33, 39, 0x5D, sysExId ];
+    for ( var i=0; i<6; ++i ) {
     	if ( header[i] != data[i] ) {
     		return;
     	}
     }
 	var dd = log( "received sysex (" + data.length + " bytes)" );
 	dumpSysex( data, "rxSysex", dd+"\n" );
-	if ( data[5] == 0x33 ) {
+	if ( data[6] == 0x33 ) {
 		processScreenshot( data.slice( 8, -1 ) );
 	}
 }
 function request() {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x01, 0xF7 ];
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x01, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent screenshot request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -227,6 +237,8 @@ function sendMsg() {
 	var dd = log( "sent sysex (" + str.length + " bytes)" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
+
+var sysExId = 0;
 
 </script>
 

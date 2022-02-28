@@ -95,6 +95,13 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 
 Send to MIDI port: <select id="midioutput"></select>
 Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
+SysEx ID: <select id="sysExId" onchange='changeSysExId()'>
+<script>
+for ( let i=0; i<127; ++i ) {
+	document.write( "<option value=" + i + ">" + i + "</option>" );
+}
+</script>
+</select>
 <p>
 <textarea rows=5 cols=50 id="log" class="log" readOnly></textarea>
 <textarea rows=5 cols=45 name="text" id="txSysex"></textarea>
@@ -230,19 +237,22 @@ function changeInput() {
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
 }
+function changeSysExId() {
+	sysExId = document.getElementById( "sysExId" ).value;
+}
 function onMIDIMessage(message) {
     data = message.data;
-    var header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D ];
-    for ( var i=0; i<5; ++i ) {
+    var header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId ];
+    for ( var i=0; i<6; ++i ) {
     	if ( header[i] != data[i] ) {
     		return;
     	}
     }
 	let dd = log( "received sysex (" + data.length + " bytes)" );
 	let dump = true;
-	if ( data[5] == 0x32 ) {
+	if ( data[6] == 0x32 ) {
 		// message
-	    var str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+	    var str = String.fromCharCode.apply( null, data.slice( 7, -1 ) );
 		document.getElementById( "rxSysex" ).value = dd + ( "\n-----\n" + str );
 		dump = false;
 	}
@@ -252,7 +262,7 @@ function onMIDIMessage(message) {
 }
 function makeSclSysEx() {
 	let which = 0;//document.getElementById( "whichScl" ).value;
-	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x11, which];
+	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x11, which];
 	let len = d.length;
 	let str = "";
 	for ( let i = 0; i < len; ++i ) {
@@ -266,7 +276,7 @@ function makeSclSysEx() {
 }
 function makeKbmSysEx() {
 	let which = 0;//document.getElementById( "whichKbm" ).value;
-	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, 0x12, which];
+	let d = [0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x12, which];
 	let len = d.length;
 	let str = "";
 	for ( let i = 0; i < len; ++i ) {
@@ -300,6 +310,8 @@ function installKbm() {
 	var dd = log( "sent sysex (" + str.length + " bytes)" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
+
+var sysExId = 0;
 
 </script>
 

@@ -119,8 +119,8 @@ case 38:   // Up cursor = encoder anti-clockwise
 {
 if (event.altKey && event.shiftKey)
 {
-lastButton = controlEvents.encoderCCW;
-remote(controlEvents.encoderCCW);
+lastButton = controlEvents.P_CCW;
+remote(controlEvents.P_CCW);
 }
 }
 break;
@@ -129,8 +129,8 @@ case 40:  // cursor down = encoder clockwise
 {
 if (event.altKey && event.shiftKey)
 {
-lastButton = controlEvents.encoderCW;
-remote(controlEvents.encoderCW);
+lastButton = controlEvents.P_CW;
+remote(controlEvents.P_CW);
 }
 }
 break;
@@ -139,8 +139,8 @@ case 37:   // cursor left = left button press
 {
 if (event.altKey && event.shiftKey)
 {
-lastButton = controlEvents.leftButtonPress;
-remote(controlEvents.leftButtonPress);
+lastButton = controlEvents.V_Press;
+remote(controlEvents.V_Press);
 }
 }
 break;
@@ -149,8 +149,8 @@ case 39:  // cursor right = press encoder
 {
 if (event.altKey && event.shiftKey)
 {
-lastButton = controlEvents.encoderPress;
-remote(controlEvents.encoderPress);
+lastButton = controlEvents.P_Press;
+remote(controlEvents.P_Press);
 }
 }
 break;
@@ -159,8 +159,8 @@ case 76:  // l = long left button press
 {
 if (event.altKey)
 {
-lastButton = controlEvents.leftButtonLongPress;
-remote(controlEvents.leftButtonLongPress);
+lastButton = controlEvents.V_LongPress;
+remote(controlEvents.V_LongPress);
 }
 }
 break;
@@ -275,6 +275,14 @@ This version is for disting EX firmware v1.12 and above.
 <select id="midiinput" onchange="changeInput()" accesskey="i"></select>
 <label for="midioutput">MIDI output port: </label>
 <select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
+<label for="sysExId">SysEx ID: </label>
+<select id="sysExId" onchange='changeSysExId()'>
+<script>
+for ( let i=0; i<127; ++i ) {
+	document.write( "<option value=" + i + ">" + i + "</option>" );
+}
+</script>
+</select>
 <br>
 </p><p>
 <h1>Display</h1>
@@ -296,11 +304,15 @@ This version is for disting EX firmware v1.12 and above.
 <li>Press Alt (Windows) or Option (Mac) + l to perform a long left button press.</li>
 </ul>
 <h1>Remote control</h1>
-<button onclick="remote(controlEvents.encoderPress)">Encoder push</button>
-<button onclick="remote(controlEvents.encoderCW)">Encoder CW</button>
-<button onclick="remote(controlEvents.encoderCCW)">Encoder CCW</button>
-<button onclick="remote(controlEvents.leftButtonPress)">Left button push</button>
-<button onclick="remote(controlEvents.leftButtonLongPress)">Left button long push</button>
+<button onclick="remote(controlEvents.P_Press)">P push</button>
+<button onclick="remote(controlEvents.P_CW)">P CW</button>
+<button onclick="remote(controlEvents.P_CCW)">P CCW</button>
+<button onclick="remote(controlEvents.V_Press)">V push</button>
+<button onclick="remote(controlEvents.V_CW)">V CW</button>
+<button onclick="remote(controlEvents.V_CCW)">V CCW</button>
+<button onclick="remote(controlEvents.V_LongPress)">V long push</button>
+<button onclick="remote(controlEvents.L_Press)">L push</button>
+<button onclick="remote(controlEvents.R_Press)">R push</button>
 <button onclick="reqAllText()" accesskey="r">Refresh Display</button>
 <button onclick="reqParameterName();reqParameterValue()" accesskey="v">Refresh Parameter</button>
 <h1>Info</h1>
@@ -348,14 +360,15 @@ const displayResponses =
 
 	const controlEvents =
 	{
-        encoderPress: 1,
-        encoderCW: 2,
-        encoderCCW: 3,
-        leftButtonPress: 4,
-        leftButtonLongPress: 5,
-        autoCalibrationComplete: 6,
-        presetLoaded: 7,
-        clockChanged: 9,
+        P_Press: 1,
+        P_CW: 2,
+        P_CCW: 3,
+        V_Press: 4,
+        V_CW: 5,
+        V_CCW: 6,
+        V_LongPress: 7,
+        L_Press: 8,
+        R_Press: 9,
     }
 
 function logKey(e) {
@@ -432,11 +445,15 @@ function changeOutput() {
 	reqPresetName();  // Populaate the div for the active preset
 }
 
+function changeSysExId() {
+	sysExId = document.getElementById( "sysExId" ).value;
+}
+
 function parseDisplayResponse( data ) 
 {
-	let displayMode = data[6];
+	let displayMode = data[7];
 	let lines = [ "", "", "", "" ];	
-	let c = 7;
+	let c = 8;
 	
 	for ( let y=0; y<4; ++y )
 	{
@@ -467,76 +484,41 @@ function parseDisplayResponse( data )
  sayDisplayState( displayMode, lastButton);
 }
 
-	function refreshTuner() {
-if (document.getElementById("display1").textContent.substr(0,5) == "Tuner")
-{
-		reqParameterValue();
-}
-	}
-
 	function parseButtonPress( data ) 
 {
-    let buttonEvent = data[6];
-    let displayMode = data[7];
+    let buttonEvent = data[7];
+    let displayMode = data[8];
 	lastButton = buttonEvent;
     lastDisplayMode = displayMode;
 
-    if ( displayMode == displayModes.kDisplayModeTuner )
-	{
-		reqParameterName();
-tunerID = setInterval(function(){ refreshTuner(); }, 1000);
-    	return;
-		}
-else
-{
-clearInterval(tunerID);
-}
-
 	switch (buttonEvent)   // What kind of button event
 	{
-		case controlEvents.encoderPress:  
+		case controlEvents.P_Press:  
 		{
 			setTimeout( reqAllText, 100 );
 		}
 		break;
 
-		case controlEvents.encoderCW: 
-		case controlEvents.encoderCCW:
+		case controlEvents.P_CW: 
+		case controlEvents.P_CCW:
+		case controlEvents.V_CW: 
+		case controlEvents.V_CCW:
 		{
 			setTimeout( reqAllText, 100 );
 		}
 		break;
 
-		case controlEvents.leftButtonPress:
+		case controlEvents.V_Press:
+		case controlEvents.L_Press:
+		case controlEvents.R_Press:
 		{
 			setTimeout( reqAllText, 100 );
 		}
 		break;
 
-		case controlEvents.leftButtonLongPress:
+		case controlEvents.V_LongPress:
 		{
 			setTimeout( reqAllText, 100 );
-		}
-		break;
-		
-		case controlEvents.autoCalibrationComplete:
-		{
-			document.getElementById("display3").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject";
-			document.getElementById("info_alert").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject, but remember to unplug your V C O first";
-		}
-		break;
-		
-		case controlEvents.presetLoaded:
-		{
-			document.getElementById("info_alert").innerHTML = "Preset loaded";
-			reqPresetName();
-		}
-		break;
-		
-		case controlEvents.clockChanged:
-		{
-			document.getElementById("info_alert").innerHTML = getClockType();
-			setTimeout( reqClockInfo, 100 );
 		}
 		break;
 
@@ -551,9 +533,9 @@ clearInterval(tunerID);
 function onMIDIMessage(message) 
 {
     data = message.data;
-    let header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D ];
+    let header = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId ];
 
-    for ( let i=0; i<5; ++i )
+    for ( let i=0; i<6; ++i )
 	{
     	if ( header[i] != data[i] ) 
 		{
@@ -561,7 +543,7 @@ function onMIDIMessage(message)
     	}
     }
 
-	switch (data[5])
+	switch (data[6])
 {
 	case displayResponses.panelEvent:    		// Button event
 	{
@@ -577,7 +559,7 @@ function onMIDIMessage(message)
 
 	case displayResponses.parameterName:    		// Parameter name
 	{
-	    let str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+	    let str = String.fromCharCode.apply( null, data.slice( 7, -1 ) );
 		parameterName = str;
 	    // document.getElementById( "info_alert" ).innerHTML = str;
 	}
@@ -587,9 +569,9 @@ function onMIDIMessage(message)
 	{
 	if (parameterName != "Sorry")
 	{
-		value = String.fromCharCode.apply( null, data.slice( 7, -1 ) );
+		value = String.fromCharCode.apply( null, data.slice( 8, -1 ) );
 		value = value.replace( "<", "&lt;" ).replace( ">", "&gt;" );
-		let isName = data[6];
+		let isName = data[7];
 	    let str = parameterName + ": " + value;
 
 		if (isName)  // Show a textarea so that the user can edit the name
@@ -597,32 +579,6 @@ function onMIDIMessage(message)
 			value = value.split('\001')[0];
 			document.getElementById("name_entry").value = value;
 		}
-		else if (parameterName == "Tuner") {
-            if (value == "Out of range") {
-                document.getElementById("info_alert").innerHTML = value;
-			}
-			else {
-let noteName = getNoteName(value);
-				document.getElementById("display1").innerHTML = parameterName + " - remember to unplug your V C O from X or Y before pressing the Encoder or the Left button to quit";
-				document.getElementById("display2").innerHTML = noteName;
-				document.getElementById("display3").innerHTML = getTuningError(value);
-				document.getElementById("display4").innerHTML = getDetectedFrequency(value);
-                
-if (document.getElementById("info_alert").textContent == noteName)
-{  // Note name is stable, so just announce the tuning error
-document.getElementById("info_alert").innerHTML = noteName + " " + getTuningError(value);
-}
-else
-{  // Announce the new note name
-document.getElementById("info_alert").innerHTML = noteName;
-}
-			}
-}
-else if (parameterName == "GO!")
-{
-str = parameterName + ": Press the Encoder to start auto calibration for " + document.getElementById("display1").textContent;
-	    	document.getElementById( "info_alert" ).innerHTML = str;
-}
 		else
 {
 	    	document.getElementById( "info_alert" ).innerHTML = str;
@@ -631,48 +587,11 @@ str = parameterName + ": Press the Encoder to start auto calibration for " + doc
 		}  // parameterName != "Sorry"
 	break;
 	
-	case displayResponses.autoCalibrationComplete:
-	{
-			document.getElementById("display3").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject";
-			document.getElementById("info_alert").innerHTML = "AutoCalibration complete - Press the Encoder to accept, or the Left button to reject, but remember to unplug your V C O first";
-	    	}
-    break;
-	
 	case displayResponses.presetName:
 	{
-	    let str = String.fromCharCode.apply( null, data.slice( 6, -1 ) );
+	    let str = String.fromCharCode.apply( null, data.slice( 7, -1 ) );
 	    // console.log( str );
 	    	document.getElementById( "active-preset" ).innerHTML = "Active preset: " + str;
-	}
-    break;
-	
-	case displayResponses.clockInfo:
-	{
-		let itempo = ( data[6] << 0 ) | ( data[7] << 7 ) | ( data[8] << 14 ) | ( data[9] << 21 ) | ( data[10] << 28 );
-		let running = data[11];
-		let clocking = data[12];
-		let buffer = new ArrayBuffer(4);
-		let f32 = new Float32Array(buffer);
-		let ui8 = new Uint8Array(buffer);
-		ui8[0] = ( itempo >> 0 ) & 0xff;
-		ui8[1] = ( itempo >> 8 ) & 0xff;
-		ui8[2] = ( itempo >> 16 ) & 0xff;
-		ui8[3] = ( itempo >> 24 ) & 0xff;
-		let tempo = f32[0];
-		let clockRunning = [ "None", "DIN", "USB A", "USB C", "Int", "Ext" ][ running ];
-		let clockSourceNotRunning = "";
-		if ( clocking & (1<<0) ) {
-			clockSourceNotRunning += "D";
-		}
-		if ( clocking & (1<<1) ) {
-			clockSourceNotRunning += "A";
-		}
-		if ( clocking & (1<<2) ) {
-			clockSourceNotRunning += "C";
-		}
-	    // console.log( tempo, clockRunning, clockSourceNotRunning );
-//	    	document.getElementById( "info_alert" ).innerHTML = tempo + " " + clockRunning + " " + clockSourceNotRunning;
-	    	document.getElementById( "info_alert" ).innerHTML = getClockInfo();
 	}
     break;
 }  // end switch
@@ -681,10 +600,10 @@ str = parameterName + ": Press the Encoder to start auto calibration for " + doc
 function textEntryChanged()
 {
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x47 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x77 ];
 	let name = document.getElementById( "name_entry" ).value;
 	for ( let i = 0; i < name.length; ++i ) {
-		arr[6+i] = name.charCodeAt( i );
+		arr[7+i] = name.charCodeAt( i );
 	}
 	arr.push( 0xF7 );
 	output.send( arr );
@@ -693,7 +612,7 @@ function textEntryChanged()
 function remote( event )
 {
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x48, event, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x78, event, 0xF7 ];
 	output.send( arr );
 reqAllText();
 }
@@ -794,21 +713,21 @@ case -1:
 }
 break;
 
-case controlEvents.leftButtonPress:  
+case controlEvents.V_Press:  
 {
 document.getElementById("info_alert").innerHTML = getClockType();
 }
 break;
 
-case controlEvents.leftButtonLongPress:
+case controlEvents.V_LongPress:
 {
 	var str = "Overview - " + getClockInfo();
 document.getElementById("info_alert").innerHTML = str;
 }
 break;
 
-case controlEvents.encoderCCW:
-case controlEvents.encoderCW:
+case controlEvents.P_CCW:
+case controlEvents.P_CW:
 {
 	document.getElementById("info_alert").innerHTML = getTempo();
 }
@@ -964,7 +883,7 @@ function getLine(lineNumber)
 function reqAllText() 
 {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x71, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x71, 0xF7 ];
 	output.send( arr );
 }
 
@@ -972,7 +891,7 @@ function reqParameterName()
 {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
 
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x73, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x73, 0xF7 ];
 	output.send( arr );
 }
 
@@ -980,19 +899,19 @@ function reqParameterValue()
 {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
 
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x74, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x74, 0xF7 ];
 	output.send( arr );
 }
 
 function reqPresetName()
 {
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, 0x7A, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x7A, 0xF7 ];
 	output.send( arr );
 }
 
 // global code
-var tunerID = -1;
+var sysExId = 0;
 if ( navigator.requestMIDIAccess ) 
 {
     navigator.requestMIDIAccess ( 
