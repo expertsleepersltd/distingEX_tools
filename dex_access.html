@@ -268,15 +268,15 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 </div>
 <div class="small" id="status" role="status">Web MIDI status: OK</div>
 <div class="small">
-This version is for disting EX firmware v1.12 and above.
+This version is for disting EX firmware v1.13 and above.
 </div>
 <p>
-<label for="midiinput">MIDI input port: </label>
-<select id="midiinput" onchange="changeInput()" accesskey="i"></select>
-<label for="midioutput">MIDI output port: </label>
+<label for="midioutput">Send to MIDI port:</label>
 <select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
+<label for="midiinput">Listen on MIDI port: </label>
+<select id="midiinput" onchange="changeInput()" accesskey="i"></select>
 <label for="sysExId">SysEx ID: </label>
-<select id="sysExId" onchange='changeSysExId()'>
+<select id="sysExId" onchange='changeSysExId()' accesskey="s">
 <script>
 for ( let i=0; i<127; ++i ) {
 	document.write( "<option value=" + i + ">" + i + "</option>" );
@@ -289,7 +289,6 @@ for ( let i=0; i<127; ++i ) {
 <div class="lcd_text" id="display1" > </div>
 <div class="lcd_text" id="display2" > </div>
 <div class="lcd_text" id="display3" > </div>
-<div class="lcd_text" id="display4" > </div>
 </p><p>
 <div class="lcd_text" id="active-config" role="status"> </div>
 <div class="lcd_text" id="active-preset" role="status" > </div>
@@ -331,22 +330,12 @@ document.addEventListener("keydown", keyFunction);
 
 	const displayModes =
 	{
-        kDisplayModeNormal: 0,
-        kDisplayModeMenu: 1,
-        kDisplayModeMessage4x16: 2,
-        kDisplayModeDirContents: 3,
-        kDisplayModeTestInputs: 4,
-        kDisplayModeMIDIHistory: 5,
-        kDisplayModeTapTempo: 6,
-        kDisplayModeAutoCalibrate: 7,
-        kDisplayModeTuner: 8,
-        kDisplayModeEuclidean: 9,
-        kDisplayModeArpeggiator: 10,
-        kDisplayModeLFO: 11,
-        kDisplayModeEnvelope: 12,
-        kDisplayModeShell: 13,
-        kDisplayModeStats: 14,
-        kDisplayModeTempBigMessage: 15,
+        displayModeNormal: 0,
+        displayModeMenu: 1,
+        displayModeMessage4x16: 2,
+        displayModeDirContents: 3,
+        displayModeTestInputs: 4,
+        displayModeMIDIHistory: 5
     }
 
 const displayResponses =
@@ -384,35 +373,37 @@ function onMIDISuccess(midiAccess)
 }
 
 function onStateChange(e) {
-    var str = "";
-    let prevIn = document.getElementById( "midiinput" ).value;
-    let prevOut = document.getElementById( "midioutput" ).value;
-    let prevInOK = false;
-    let prevOutOK = false;
-    var inputs = midi.inputs.values();
+    let str = "";
+    let dex = -1;
+    let inputs = midi.inputs.values();
+
     for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
 	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
-	    if ( input.value.id == prevIn ) {
-		    prevInOK = true;
+	    if ( input.value.name == dexInPortName) {
+		    dex = input.value.id;
 	    }
     }
     document.getElementById( "midiinput" ).innerHTML = str;
-    if ( prevInOK ) {
-	    document.getElementById( "midiinput" ).value = prevIn;
+    if ( dex != -1 ) {
+	    document.getElementById( "midiinput" ).value = dex;
 	}
+
+    dex = -1;
     str = "";
-    es9 = -1;
-    var outputs = midi.outputs.values();
+    let outputs = midi.outputs.values();
+
     for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
 	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
-	    if ( output.value.id == prevOut ) {
-		    prevOutOK = true;
+	    if ( output.value.name == dexOutPortName) {
+		    dex = output.value.id;
 	    }
     }
     document.getElementById( "midioutput" ).innerHTML = str;
-    if ( prevOutOK ) {
-	    document.getElementById( "midioutput" ).value = prevOut;
+    if ( dex != -1 ) {
+	    document.getElementById( "midioutput" ).value = dex;
 	}
+
+	document.getElementById("sysExId").selectedIndex = sysExId;
 
 	changeInput();
 }
@@ -436,17 +427,30 @@ function changeInput()
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
 
+	// Save the current port setting
+	let inputSelector = document.getElementById("midiinput"); 
+let selectedPortName = inputSelector.options[inputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIInKey, selectedPortName);
+
 	reqAllText();   // Initialise the display and parameter divs with display data
-	reqPresetName();  // Populaate the div for the active preset
+	reqPresetName();  // Populate the div for the active preset
 }
 
 function changeOutput() {
+let outputSelector = document.getElementById("midioutput"); 
+let selectedPortName = outputSelector.options[outputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIOutKey, selectedPortName);
+
 	reqAllText();   // Initialise the display and parameter divs with display data
-	reqPresetName();  // Populaate the div for the active preset
+	reqPresetName();  // Populate the div for the active preset
 }
 
 function changeSysExId() {
 	sysExId = document.getElementById( "sysExId" ).value;
+   localStorage.setItem(dexSysExKey, sysExId);
+
+	reqAllText();   // Initialise the display and parameter divs with display data
+	reqPresetName();  // Populate the div for the active preset
 }
 
 function parseDisplayResponse( data ) 
@@ -477,7 +481,6 @@ function parseDisplayResponse( data )
     document.getElementById("display1").innerHTML = lines[0];
 		document.getElementById("display2").innerHTML = lines[1];
 		document.getElementById("display3").innerHTML = lines[2];
-		document.getElementById("display4").innerHTML = lines[3];
 		document.getElementById("display1").focus();
 
 	// Try and announce an appropriate display title
@@ -629,81 +632,10 @@ function send()
 	output.send( arr );
 }
 
-function getTempo()
-{
-var strTempo = document.getElementById("display2").textContent;
-let bpmPos = strTempo.indexOf( "bpm");
-let tempoPos = strTempo.lastIndexOf( " ", bpmPos);
-return strTempo.substr(tempoPos, (bpmPos - tempoPos));
-}
-
-function getClockType()
-{
-var strClockType = document.getElementById("display1").textContent;
-return strClockType.substr( strClockType.indexOf( "Clk:"));
-}
-
-function getClockInfo()
-{
-return getClockType() + " - " + getTempo();
-}
-
-function getNoteName(str)
-{
-var noteName = "";
-
-    if (document.getElementById("display1").innerHTML.substr( 0, 7) == "Tuner -")
-	{
-noteName = str.substr(0, 1);
-
-if (str.substr( 1, 1) == "b")
-{
-noteName += " flat ";
-noteName += str.substr(3,1);  // Octave number follows a space
-}
-else if (str.substr(1, 1) == "#")
-{
-noteName += " sharp ";
-noteName += str.substr(3,1);  // Octave number follows a space
-}
-else
-{
-noteName += str.substr(2,1);  // Octave number follows a space
-}
-}
-return noteName;
-}
-
-function getTuningError(str)
-{
-var tuningError = "";
-var centsPos = str.indexOf(" cents");
-
-if (centsPos != -1)
-{
-tuningError = str.substr( 0, centsPos);
-tuningError = tuningError.substr( tuningError.lastIndexOf(" ")) + " cents"; 
-}
-return tuningError;
-}
-
-function getDetectedFrequency(str)
-{
-var detectedFreq = "";
-var hertzPos = str.indexOf("Hz");
-
-if (hertzPos != -1)
-{
-detectedFreq = str.substr( str.lastIndexOf(" ")); 
-}
-return detectedFreq;
-}
-
-function sayDisplayState( displayMode, messageID)
-{
+function sayDisplayState( displayMode, messageID) {
 		switch (displayMode)
 	{
-		case displayModes.kDisplayModeNormal:
+		case displayModes.displayModeNormal:
 			{
 switch (messageID)
 {
@@ -715,45 +647,45 @@ break;
 
 case controlEvents.V_Press:  
 {
-document.getElementById("info_alert").innerHTML = getClockType();
+	return;
 }
 break;
 
 case controlEvents.V_LongPress:
 {
-	var str = "Overview - " + getClockInfo();
-document.getElementById("info_alert").innerHTML = str;
+let line1 = document.getElementById("display1").textContent.trim();
+let line2 = document.getElementById("display2").textContent.trim();
+let line3 = document.getElementById("display3").textContent.trim();
+document.getElementById("info_alert").innerHTML = line1 + " " + line2 + " = " + line3.substr(line3.indexOf( " "));
 }
 break;
 
 case controlEvents.P_CCW:
 case controlEvents.P_CW:
+case controlEvents.V_CCW:
+case controlEvents.V_CW:
 {
-	document.getElementById("info_alert").innerHTML = getTempo();
+let line2 = document.getElementById("display2").textContent.trim();
+let line3 = document.getElementById("display3").textContent.trim();
+document.getElementById("info_alert").innerHTML = line2 + " = " + line3.substr(line3.indexOf( " "));
 }
 break;
 
 default:
 {
-	document.getElementById("info_alert").innerHTML = getClockType();
+return;
 }
 break;
 }  // end messageID switch
 }
 			break;
 
-		case displayModes.kDisplayModeMenu:
+		case displayModes.displayModeMenu:
 			{
-var line3 = document.getElementById("display3").textContent.trim();
+let line3 = document.getElementById("display3").textContent.trim();
 
-if (line3 != "")
-{
-	document.getElementById("info_alert").innerHTML = "";
-	document.getElementById("info_alert").innerHTML = line3;
-}
-else
-{
-                // document.getElementById("info_alert").innerHTML = "unidentified Menu option";
+if (line3 != "") {
+document.getElementById("info_alert").innerHTML = line3;
 }
 
 let display1 = document.getElementById("display1").textContent;
@@ -771,7 +703,7 @@ document.getElementById("textInput").hidden = true;
 }
 			break;
 
-case displayModes.kDisplayModeMessage4x16:
+case displayModes.displayModeMessage4x16:
 			{
 if (document.getElementById("display1").textContent.substr(0,11) == "Calibration")
 {
@@ -784,81 +716,21 @@ else
             }
 			break;
 
-case displayModes.kDisplayModeDirContents:
+case displayModes.displayModeDirContents:
 			{
 	document.getElementById("info_alert").innerHTML = "Directory contents";
             }
 			break;
 
-case displayModes.kDisplayModeTestInputs:
+case displayModes.displayModeTestInputs:
 			{
 	document.getElementById("info_alert").innerHTML = "Test inputs. This is graphical and not accessible, so press the Left button to exit";
             }
 			break;
 
-case displayModes.kDisplayModeMIDIHistory:
+case displayModes.displayModeMIDIHistory:
 			{
 	document.getElementById("info_alert").innerHTML = "MIDI history. This is not scrollable - press the left button to exit";
-            }
-			break;
-
-case displayModes.kDisplayModeTapTempo:
-			{
-	document.getElementById("info_alert").innerHTML = "Tap tempo";
-            }
-			break;
-
-case displayModes.kDisplayModeAutoCalibrate:
-			{
-				document.getElementById("display1").innerHTML = "Auto Calibration complete - remember to unplug your V C O from X or Y before pressing the Encoder to Accept or the Left button to Reject the calibration";
-	document.getElementById("info_alert").innerHTML = "Auto Calibration complete - remember to unplug your V C O from X or Y before pressing the Encoder to Accept or the Left button to Reject the calibration";
-            }
-			break;
-
-case displayModes.kDisplayModeTuner:
-				{
-                    }
-			break;
-
-case displayModes.kDisplayModeEuclidean:
-			{
-	document.getElementById("info_alert").innerHTML = "Euclidean";
-            }
-			break;
-
-case displayModes.kDisplayModeArpeggiator:
-			{
-	document.getElementById("info_alert").innerHTML = "Arpeggiator";
-            }
-			break;
-
-case displayModes.kDisplayModeLFO:
-			{
-	document.getElementById("info_alert").innerHTML = "LFO";
-            }
-			break;
-
-case displayModes.kDisplayModeEnvelope:
-			{
-	document.getElementById("info_alert").innerHTML = "Envelope";
-            }
-			break;
-
-case displayModes.kDisplayModeShell:
-			{
-	document.getElementById("info_alert").innerHTML = "shell";
-            }
-			break;
-
-case displayModes.kDisplayModeStats:
-			{
-	document.getElementById("info_alert").innerHTML = "Stats";
-            }
-			break;
-
-case displayModes.kDisplayModeTempBigMessage:
-			{
-	document.getElementById("info_alert").innerHTML = "Temp big message";
             }
 			break;
 
@@ -868,8 +740,8 @@ default:
 }
 break;
 }  // end switch
-	reqParameterName();
-reqParameterValue();
+	// reqParameterName();
+// reqParameterValue();
 }
 
 function getLine(lineNumber)
@@ -911,7 +783,47 @@ function reqPresetName()
 }
 
 // global code
+const dexMIDIInKey = "dexMIDIInKey";
+const dexMIDIOutKey = "dexMIDIOutKey";
+const dexSysExKey = "dexSysExKey";
+const defaultDexPortName = "Disting EX";
+
+var dexInPortName = defaultDexPortName;
+var dexOutPortName = defaultDexPortName;
 var sysExId = 0;
+
+// debugging only:
+// localStorage.removeItem(dexMIDIInKey);
+// localStorage.removeItem(dexMIDIOutKey);
+// localStorage.removeItem(dexSysExKey);
+
+if(!localStorage.getItem(dexMIDIInKey)) {  // No input stored
+// alert("saving in port");
+    localStorage.setItem(dexMIDIInKey, defaultDexPortName);
+} 
+else {
+    dexInPortName = localStorage.getItem(dexMIDIInKey);
+// alert("retrieved in port name = " + dexInPortName);
+}
+
+if(!localStorage.getItem(dexMIDIOutKey)) {  // No output stored
+// alert("saving out port name");
+    localStorage.setItem(dexMIDIOutKey, defaultDexPortName);
+} 
+else {
+    dexOutPortName = localStorage.getItem(dexMIDIOutKey);
+// alert("retrieved out port name = " + dexOutPortName);
+}
+
+if(!localStorage.getItem(dexSysExKey)) {  // No system exclusive ID stored
+// alert("saving system exclusive ID);
+    localStorage.setItem(dexSysExKey, 0);
+} 
+else {
+    sysExId = localStorage.getItem(dexSysExKey);
+// alert("retrieved system exclusive ID = " + sysExId);
+}
+
 if ( navigator.requestMIDIAccess ) 
 {
     navigator.requestMIDIAccess ( 
