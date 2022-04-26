@@ -123,9 +123,12 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 
 <!--<button  accesskey="s" onclick="sendMsg()">Send Msg</button>-->
 <button class="big"  accesskey="r" onclick="request()">Refresh</button>
-Send to MIDI output port: <select id="midioutput"  accesskey="o"></select>
-Listen on MIDI input port: <select id="midiinput"  accesskey="i" onchange='changeInput()'></select>
-SysEx ID: <select id="sysExId" onchange='changeSysExId()'>
+<label for="midioutput">Send to MIDI port:</label>
+<select id="midioutput"  onchange='changeOutput()' accesskey="o"></select>
+<label for="midiinput">Listen on MIDI port: </label>
+<select id="midiinput"  accesskey="i" onchange='changeInput()'></select>
+<label for="sysExId">SysEx ID: </label>
+<select id="sysExId" onchange='changeSysExId()' accesskey="s">
 <script>
 for ( let i=0; i<127; ++i ) {
 	document.write( "<option value=" + i + ">" + i + "</option>" );
@@ -138,18 +141,24 @@ for ( let i=0; i<127; ++i ) {
 <label class="hidden" for="rxSysex">SysEx received:</label><textarea rows=5 cols=45 name="text" id="rxSysex" accesskey="x"></textarea>
 </p>
 <label for="auto_focus">Auto-focus:</label><input id='auto_focus' type='checkbox' checked accesskey="u">
-<label for="show_mapping_cv">Show CV mappings:</label><input id='show_mapping_cv' type='checkbox' accesskey="" onchange="toggleMappings('cv')">
-<label for="show_mapping_knob">Show knob mappings:</label><input id='show_mapping_knob' type='checkbox' accesskey="" onchange="toggleMappings('knob')">
-<label for="show_mapping_button">Show button mappings:</label><input id='show_mapping_button' type='checkbox' accesskey="" onchange="toggleMappings('button')">
-<label for="show_mapping_midi">Show MIDI mappings:</label><input id='show_mapping_midi' type='checkbox' accesskey="" onchange="toggleMappings('midi')">
-<label for="show_mapping_i2c">Show I2C mappings:</label><input id='show_mapping_i2c' type='checkbox' accesskey="" onchange="toggleMappings('i2c')">
+<label for="show_mapping_cv">Show CV mappings:</label>
+<input id='show_mapping_cv' type='checkbox' accesskey="c" onchange="toggleMappings('cv')">
+<label for="show_mapping_knob">Show knob mappings:</label>
+<input id='show_mapping_knob' type='checkbox' accesskey="k" onchange="toggleMappings('knob')">
+<label for="show_mapping_button">Show button mappings:</label>
+<input id='show_mapping_button' type='checkbox' accesskey="b" onchange="toggleMappings('button')">
+<label for="show_mapping_midi">Show MIDI mappings:</label>
+<input id='show_mapping_midi' type='checkbox' accesskey="m" onchange="toggleMappings('midi')">
+<label for="show_mapping_i2c">Show I2C mappings:</label>
+<input id='show_mapping_i2c' type='checkbox' accesskey="2" onchange="toggleMappings('i2c')">
 <br>
-<div id='alg_name'>
+<div15:06 15/04/2022 id='alg_name'>
 <label for="active_alg_name">Algorithm:</label><input id='active_alg_name' accesskey='a' type='text' readonly>
 </div>
 <br>
 <label for="preset_name">Preset name:</label><input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
-<label for="mapping_name">Mapping name:</label><input id='mapping_name' accesskey='' type='text' onchange='send_mapping_name()'>
+<label for="mapping_name">Mapping name:</label>
+<input id='mapping_name' accesskey='n' type='text' onchange='send_mapping_name()'>
 <div id='parameters'></div>
 
 <script>
@@ -774,6 +783,47 @@ function mapping_i2c_max( p ) {
 
 <script>
 var midi, data;
+const dexMIDIInKey = "dexMIDIInKey";
+const dexMIDIOutKey = "dexMIDIOutKey";
+const dexSysExKey = "dexSysExKey";
+const defaultDexPortName = "Disting EX";
+
+var dexInPortName = defaultDexPortName;
+var dexOutPortName = defaultDexPortName;
+var sysExId ;
+
+// debugging only:
+// localStorage.removeItem(dexMIDIInKey);
+// localStorage.removeItem(dexMIDIOutKey);
+// localStorage.removeItem(dexSysExKey);
+
+if(!localStorage.getItem(dexMIDIInKey)) {  // No input stored
+// alert("saving in port");
+    localStorage.setItem(dexMIDIInKey, defaultDexPortName);
+} 
+else {
+    dexInPortName = localStorage.getItem(dexMIDIInKey);
+// alert("retrieved in port name = " + dexInPortName);
+}
+
+if(!localStorage.getItem(dexMIDIOutKey)) {  // No output stored
+// alert("saving out port name");
+    localStorage.setItem(dexMIDIOutKey, defaultDexPortName);
+} 
+else {
+    dexOutPortName = localStorage.getItem(dexMIDIOutKey);
+// alert("retrieved out port name = " + dexOutPortName);
+}
+
+if(!localStorage.getItem(dexSysExKey)) {  // No system exclusive ID stored
+alert("saving system exclusive ID");
+    localStorage.setItem(dexSysExKey, 0);
+} 
+else {
+    sysExId = localStorage.getItem(dexSysExKey);
+// alert("retrieved system exclusive ID = " + sysExId);
+}
+
 if ( navigator.requestMIDIAccess ) {
     navigator.requestMIDIAccess ( {
         sysex: true
@@ -783,33 +833,37 @@ if ( navigator.requestMIDIAccess ) {
 }
 function onMIDISuccess(midiAccess) {
     midi = midiAccess;
-    var str = "";
-    var fh2 = -1;
-    var inputs = midi.inputs.values();
+    let str = "";
+    let dex = -1;
+    let inputs = midi.inputs.values();
+
     for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
 	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
-	    if ( input.value.name == "FH-2" ) {
-		    fh2 = input.value.id;
+	    if ( input.value.name == dexInPortName ) {
+		    dex = input.value.id;
 	    }
     }
     document.getElementById( "midiinput" ).innerHTML = str
-    if ( fh2 != -1 ) {
-	    document.getElementById( "midiinput" ).value = fh2;
+    if ( dex != -1 ) {
+	    document.getElementById( "midiinput" ).value = dex;
     }
+
     str = "";
-    fh2 = -1;
-    var outputs = midi.outputs.values();
+    dex = -1;
+    let outputs = midi.outputs.values();
+
     for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
 	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
-	    if ( output.value.name == "FH-2" ) {
-		    fh2 = output.value.id;
+	    if ( output.value.name == dexOutPortName ) {
+		    dex = output.value.id;
 	    }
     }
     document.getElementById( "midioutput" ).innerHTML = str
-    if ( fh2 != -1 ) {
-	    document.getElementById( "midioutput" ).value = fh2;
+    if ( dex != -1 ) {
+	    document.getElementById( "midioutput" ).value = dex;
     }
 
+	document.getElementById("sysExId").selectedIndex = sysExId;
 	changeInput();
 
 	log( "midi access granted" );
@@ -826,10 +880,24 @@ function changeInput() {
     }
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
+
+	// Save the current port setting
+	let inputSelector = document.getElementById("midiinput"); 
+let selectedPortName = inputSelector.options[inputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIInKey, selectedPortName);
 }
+
+function changeOutput() {
+let outputSelector = document.getElementById("midioutput"); 
+let selectedPortName = outputSelector.options[outputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIOutKey, selectedPortName);
+}
+
 function changeSysExId() {
 	sysExId = document.getElementById( "sysExId" ).value;
+   localStorage.setItem(dexSysExKey, sysExId);
 }
+
 function onMIDIMessage(message) {
     data = message.data;
     var header = [ 240, 0, 33, 39, 0x5D, sysExId ];
@@ -893,9 +961,6 @@ function sendMsg() {
 	var dd = log( "sent sysex (" + str.length + " bytes)" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
-
-var sysExId = 0;
-
 </script>
 
 </body>

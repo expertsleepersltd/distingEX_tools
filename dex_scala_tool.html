@@ -92,10 +92,12 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 </div>
 <div class="small" id="status"></div>
 <p>
-
-Send to MIDI port: <select id="midioutput"></select>
-Listen on MIDI port: <select id="midiinput" onchange='changeInput()'></select>
-SysEx ID: <select id="sysExId" onchange='changeSysExId()'>
+<label for="midioutput">Send to MIDI port:</label>
+<select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
+<label for="midiinput">Listen on MIDI port: </label>
+<select id="midiinput" onchange='changeInput()' accesskey="i"></select>
+<label for="sysExId">SysEx ID: </label>
+<select id="sysExId" onchange='changeSysExId()' accesskey="s">
 <script>
 for ( let i=0; i<127; ++i ) {
 	document.write( "<option value=" + i + ">" + i + "</option>" );
@@ -112,7 +114,7 @@ for ( let i=0; i<127; ++i ) {
 <td>
 <input type="file" id="uploadScl" name="files[]" single />
 <br>
-<button class="big" onclick="installScl()">Send .scl</button>
+<button class="big" onclick="installScl()" accesskey="c">Send .scl</button>
 <!--
 to slot <select id="whichScl">
 <script>
@@ -126,7 +128,7 @@ to slot <select id="whichScl">
 <td>
 <input type="file" id="uploadKbm" name="files[]" single />
 <br>
-<button class="big" onclick="installKbm()">Send .kbm</button>
+<button class="big" onclick="installKbm()" accesskey="k">Send .kbm</button>
 <!--
 to slot <select id="whichKbm">
 <script>
@@ -175,6 +177,47 @@ to slot <select id="whichKbm">
 
 <script>
 var midi, data;
+const dexMIDIInKey = "dexMIDIInKey";
+const dexMIDIOutKey = "dexMIDIOutKey";
+const dexSysExKey = "dexSysExKey";
+const defaultDexPortName = "Disting EX";
+
+var dexInPortName = defaultDexPortName;
+var dexOutPortName = defaultDexPortName;
+var sysExId;
+
+// debugging only:
+// localStorage.removeItem(dexMIDIInKey);
+// localStorage.removeItem(dexMIDIOutKey);
+// localStorage.removeItem(dexSysExKey);
+
+if(!localStorage.getItem(dexMIDIInKey)) {  // No input stored
+// alert("saving in port");
+    localStorage.setItem(dexMIDIInKey, defaultDexPortName);
+} 
+else {
+    dexInPortName = localStorage.getItem(dexMIDIInKey);
+// alert("retrieved in port name = " + dexInPortName);
+}
+
+if(!localStorage.getItem(dexMIDIOutKey)) {  // No output stored
+// alert("saving out port name");
+    localStorage.setItem(dexMIDIOutKey, defaultDexPortName);
+} 
+else {
+    dexOutPortName = localStorage.getItem(dexMIDIOutKey);
+// alert("retrieved out port name = " + dexOutPortName);
+}
+
+if(!localStorage.getItem(dexSysExKey)) {  // No system exclusive ID stored
+// alert("saving system exclusive ID);
+    localStorage.setItem(dexSysExKey, 0);
+} 
+else {
+    sysExId = localStorage.getItem(dexSysExKey);
+// alert("retrieved system exclusive ID = " + sysExId);
+}
+
 if ( navigator.requestMIDIAccess ) {
     navigator.requestMIDIAccess ( {
         sysex: true
@@ -190,36 +233,37 @@ function onMIDISuccess(midiAccess) {
     onStateChange(null);
 }
 function onStateChange(e) {
-    var str = "";
-    let prevIn = document.getElementById( "midiinput" ).value;
-    let prevOut = document.getElementById( "midioutput" ).value;
-    let prevInOK = false;
-    let prevOutOK = false;
-    var inputs = midi.inputs.values();
+    let str = "";
+    let dex = -1;
+    let inputs = midi.inputs.values();
+
     for ( var input = inputs.next(); input && !input.done; input = inputs.next() ) {
 	    str += "<option value='" + input.value.id + "'>" + input.value.name + "</option>";
-	    if ( input.value.id == prevIn ) {
-		    prevInOK = true;
+	    if ( input.value.name == dexInPortName) {
+		    dex = input.value.id;
 	    }
     }
     document.getElementById( "midiinput" ).innerHTML = str;
-    if ( prevInOK ) {
-	    document.getElementById( "midiinput" ).value = prevIn;
+    if ( dex != -1 ) {
+	    document.getElementById( "midiinput" ).value = dex;
 	}
+
+    dex = -1;
     str = "";
-    es9 = -1;
-    var outputs = midi.outputs.values();
+    let outputs = midi.outputs.values();
+
     for ( var output = outputs.next(); output && !output.done; output = outputs.next() ) {
 	    str += "<option value='" + output.value.id + "'>" + output.value.name + "</option>";
-	    if ( output.value.id == prevOut ) {
-		    prevOutOK = true;
+	    if ( output.value.name == dexOutPortName) {
+		    dex = output.value.id;
 	    }
     }
     document.getElementById( "midioutput" ).innerHTML = str;
-    if ( prevOutOK ) {
-	    document.getElementById( "midioutput" ).value = prevOut;
+    if ( dex != -1 ) {
+	    document.getElementById( "midioutput" ).value = dex;
 	}
 
+	document.getElementById("sysExId").selectedIndex = sysExId;
 	changeInput();
 }
 function onMIDIFailure(e) {
@@ -236,9 +280,22 @@ function changeInput() {
     }
 	var input = midi.inputs.get( document.getElementById( "midiinput" ).value );
 	input.onmidimessage = onMIDIMessage;
+
+	// Save the current port setting
+	let inputSelector = document.getElementById("midiinput"); 
+let selectedPortName = inputSelector.options[inputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIInKey, selectedPortName);
 }
+
+function changeOutput() {
+let outputSelector = document.getElementById("midioutput"); 
+let selectedPortName = outputSelector.options[outputSelector.selectedIndex].text;
+    localStorage.setItem(dexMIDIOutKey, selectedPortName);
+}
+
 function changeSysExId() {
 	sysExId = document.getElementById( "sysExId" ).value;
+   localStorage.setItem(dexSysExKey, sysExId);
 }
 function onMIDIMessage(message) {
     data = message.data;
@@ -310,8 +367,6 @@ function installKbm() {
 	var dd = log( "sent sysex (" + str.length + " bytes)" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
-
-var sysExId = 0;
 
 </script>
 
