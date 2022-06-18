@@ -554,7 +554,7 @@ function send_preset_name() {
 	name += "                ";
 	name = name.substring( 0, 16 );
 	for ( var i = 0; i < 16; ++i ) {
-		arr[6+i] = name.charCodeAt( i );
+		arr.push( name.charCodeAt( i ) );
 	}
 	arr.push( 0xF7 );
 	output.send( arr );
