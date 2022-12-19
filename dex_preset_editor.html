@@ -280,7 +280,7 @@ function processEnumStrings( data ) {
 function processMapping( data ) {
 	let c = 0;
 	let version = data[c]; c++;
-	if ( version != 1 ) {
+	if ( version != 2 ) {
 		alert( "Version of the mapping data does not match the expected value for this version of the tool" );
 		return;
 	}
@@ -289,6 +289,7 @@ function processMapping( data ) {
 	let count = data[c]; c++;
 	for ( let i=0; i<count; ++i ) {
 		let input = data[c]; c++;
+		let flags3 = data[c]; c++;
 		let flags = data[c]; c++;
 		let flags2 = data[c]; c++;
 		let scale = extractShort( data.slice( c, c+3 ) ); c += 3;
@@ -309,6 +310,7 @@ function processMapping( data ) {
 
 		document.getElementById( "p" + i + "_button_button" ).value = ( flags2 & 1 ) ? ( ( flags2 & 2 ) ? 2 : 1 ) : 0;
 		document.getElementById( "p" + i + "_button_offset" ).value = buttonOffset;
+		document.getElementById( "p" + i + "_button_latching" ).checked = flags3 & (1<<4);
 
 		style_cv_input( i );
 		style_knob_knob( i );
@@ -359,11 +361,11 @@ function getNextParameter() {
 function processNumParameters( num ) {
 	var str = "<table>";
 	str += "<thead>";
-	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=2 class='map_button'>Button Mapping</th><th colspan=5 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
+	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=3 class='map_button'>Button Mapping</th><th colspan=5 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
 	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th>";
 	str += "<th class='map_cv'>Input</th><th class='map_cv'>Unipolar</th><th class='map_cv'>Gate</th><th class='map_cv'>Scale</th>";
 	str += "<th class='map_knob'>Knob</th><th class='map_knob'>Rel</th><th class='map_knob'>Bipolar</th><th class='map_knob'>Offset</th><th class='map_knob'>Scale</th>";
-	str += "<th class='map_button'>Button</th><th class='map_button'>Offset</th>";
+	str += "<th class='map_button'>Button</th><th class='map_button'>Latching</th><th class='map_button'>Offset</th>";
 	str += "<th class='map_midi'>CC</th><th class='map_midi'>Enabled</th><th class='map_midi'>Symmetric</th><th class='map_midi'>Min</th><th class='map_midi'>Max</th>";
 	str += "<th class='map_i2c'>ID</th><th class='map_i2c'>Enabled</th><th class='map_i2c'>Symmetric</th><th class='map_i2c'>Min</th><th class='map_i2c'>Max</th>";
 	str += "</tr>";
@@ -399,6 +401,7 @@ function processNumParameters( num ) {
 			str += "<td class='map_knob'><input id=p" + i + "_knob_scale type='number' class='param_v' size=7 step='0.01' min='-327.68' max='327.67' onchange='mapping_knob_scale(" + i + ")'></td>";
 
 			str += "<td class='map_button'><select id=p" + i + "_button_button onchange='mapping_button_button(" + i + ")'><option value=0>---</option><option value=1>Left</option><option value=2>Right</option></select></td>";
+			str += "<td class='map_button'><input id=p" + i + "_button_latching type='checkbox' class='param_c' onchange='mapping_button_latching(" + i + ")'></td>";
 			str += "<td class='map_button'><input id=p" + i + "_button_offset type='number' class='param_v' size=7 min='-32768' max='32767' onchange='mapping_button_offset(" + i + ")'></td>";
 
 			str += "<td class='map_midi'><select id=p" + i + "_midi_cc class='param_v' onchange='mapping_midi_cc(" + i + ")'>";
@@ -629,6 +632,7 @@ function mapping_send( p ) {
 	let input = document.getElementById( "p" + p + "_cv_input" ).value;
 	let knob = document.getElementById( "p" + p + "_knob_knob" ).value;
 	let button = document.getElementById( "p" + p + "_button_button" ).value;
+	let latching = document.getElementById( "p" + p + "_button_latching" ).checked;
 	let cv_uni = document.getElementById( "p" + p + "_cv_uni" ).checked;
 	let cv_gate = document.getElementById( "p" + p + "_cv_gate" ).checked;
 	let knob_rel = document.getElementById( "p" + p + "_knob_rel" ).checked;
@@ -644,13 +648,14 @@ function mapping_send( p ) {
 	} else if ( button == 2 ) {
 		flags |= ( 3 << 6 );
 	}
+	let flags2 = latching ? (1<<4) : 0;
 	let scale = Math.round( document.getElementById( "p" + p + "_cv_scale" ).value * 100 );
 	let knobOffset = Math.round( document.getElementById( "p" + p + "_knob_offset" ).value * 100 );
 	let knobScale = Math.round( document.getElementById( "p" + p + "_knob_scale" ).value * 100 );
 	let buttonOffset = document.getElementById( "p" + p + "_button_offset" ).value;
 
 	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
-	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4D, p, input, flags&0x3f, (flags>>6)&3, (scale>>14)&3, (scale>>7)&0x7f, scale&0x7f, (knobOffset>>14)&3, (knobOffset>>7)&0x7f, knobOffset&0x7f, (knobScale>>14)&3, (knobScale>>7)&0x7f, knobScale&0x7f, (buttonOffset>>14)&3, (buttonOffset>>7)&0x7f, buttonOffset&0x7f, 0xF7 ];
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x4D, p, input, flags2, flags&0x3f, (flags>>6)&3, (scale>>14)&3, (scale>>7)&0x7f, scale&0x7f, (knobOffset>>14)&3, (knobOffset>>7)&0x7f, knobOffset&0x7f, (knobScale>>14)&3, (knobScale>>7)&0x7f, knobScale&0x7f, (buttonOffset>>14)&3, (buttonOffset>>7)&0x7f, buttonOffset&0x7f, 0xF7 ];
 	output.send( arr );
 	let dd = log( "sent midi mapping update to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
@@ -707,6 +712,9 @@ function style_button_button( p ) {
 
 function mapping_button_button( p ) {
 	style_button_button( p );
+	mapping_send( p );
+}
+function mapping_button_latching( p ) {
 	mapping_send( p );
 }
 function mapping_button_offset( p ) {
