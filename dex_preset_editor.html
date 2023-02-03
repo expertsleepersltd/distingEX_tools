@@ -280,7 +280,7 @@ function processEnumStrings( data ) {
 function processMapping( data ) {
 	let c = 0;
 	let version = data[c]; c++;
-	if ( version != 2 ) {
+	if ( version != 3 ) {
 		alert( "Version of the mapping data does not match the expected value for this version of the tool" );
 		return;
 	}
@@ -316,6 +316,7 @@ function processMapping( data ) {
 		style_knob_knob( i );
 		style_button_button( i );
 	}
+	count = data[c]; c++;
 	for ( let i=0; i<count; ++i ) {
 		let cc = data[c]; c++;
 		let flags = data[c]; c++;
@@ -330,6 +331,7 @@ function processMapping( data ) {
 		document.getElementById( "p" + i + "_midi_min" ).value = min;
 		document.getElementById( "p" + i + "_midi_max" ).value = max;
 	}
+	count = data[c]; c++;
 	for ( let i=0; i<count; ++i ) {
 		let cc = data[c]; c++;
 		let flags = data[c]; c++;
@@ -373,7 +375,7 @@ function processNumParameters( num ) {
 
 	var i;
 	for ( i=0; i<num; ++i ) {
-		str += "<tr class=" + ((i&1)?"a":"b") + "><td>" + (i+1) + "</td>";
+		str += "<tr id=row" + i + " class=" + ((i&1)?"a":"b") + "><td>" + (i+1) + "</td>";
 		str += "<td id=p" + i + "_name><h1>" + "</h1></td>";
 		str += "<td id=p" + i + "_min>" + "</td>";
 		str += "<td id=p" + i + "_max>" + "</td>";
@@ -403,6 +405,10 @@ function processNumParameters( num ) {
 			str += "<td class='map_button'><select id=p" + i + "_button_button onchange='mapping_button_button(" + i + ")'><option value=0>---</option><option value=1>Left</option><option value=2>Right</option></select></td>";
 			str += "<td class='map_button'><input id=p" + i + "_button_latching type='checkbox' class='param_c' onchange='mapping_button_latching(" + i + ")'></td>";
 			str += "<td class='map_button'><input id=p" + i + "_button_offset type='number' class='param_v' size=7 min='-32768' max='32767' onchange='mapping_button_offset(" + i + ")'></td>";
+		}
+		else {
+			str += "<td colspan=4 class='map_cv'></td><td colspan=5 class='map_knob'></td><td colspan=3 class='map_button'></td>";
+		}
 
 			str += "<td class='map_midi'><select id=p" + i + "_midi_cc class='param_v' onchange='mapping_midi_cc(" + i + ")'>";
 			for ( let j=0; j<128; ++j ) {
@@ -419,7 +425,6 @@ function processNumParameters( num ) {
 			str += "<td class='map_i2c'><input id=p" + i + "_i2c_sym type='checkbox' class='param_c' onchange='mapping_i2c_sym(" + i + ")'></td>";
 			str += "<td class='map_i2c'><input id=p" + i + "_i2c_min type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_i2c_min(" + i + ")'></td>";
 			str += "<td class='map_i2c'><input id=p" + i + "_i2c_max type='number' class='param_v' size=6 min='-32768' max='32767' onchange='mapping_i2c_max(" + i + ")'></td>";
-		}
 
 		str += "</tr>";
 	}
@@ -469,6 +474,9 @@ function processParameterInfo( data ) {
 			break;
 		}
 		name += String.fromCharCode( n );
+	}
+	if ( name.length == 0 ) {
+		document.getElementById( "row" + p ).style='display:none;';
 	}
 	document.getElementById( "p" + p + "_min" ).innerHTML = min;
 	document.getElementById( "p" + p + "_max" ).innerHTML = max;
