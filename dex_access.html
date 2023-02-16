@@ -289,6 +289,7 @@ for ( let i=0; i<127; ++i ) {
 <div class="lcd_text" id="display1" > </div>
 <div class="lcd_text" id="display2" > </div>
 <div class="lcd_text" id="display3" > </div>
+<div class="lcd_text" id="display4" > </div>
 </p><p>
 <div class="lcd_text" id="active-config" role="status"> </div>
 <div class="lcd_text" id="active-preset" role="status" > </div>
@@ -481,6 +482,7 @@ function parseDisplayResponse( data )
     document.getElementById("display1").innerHTML = lines[0];
 		document.getElementById("display2").innerHTML = lines[1];
 		document.getElementById("display3").innerHTML = lines[2];
+		document.getElementById("display4").innerHTML = lines[3];
 		document.getElementById("display1").focus();
 
 	// Try and announce an appropriate display title
