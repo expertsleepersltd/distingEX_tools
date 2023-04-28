@@ -48,10 +48,6 @@ input.param_s {
 button.param_def {
 	width: 40px;
 }
-div#alg_name {
-	display: inline;
-	margin-left: 10px;
-}
 div.pv_string {
 	display: inline;
 }
@@ -152,9 +148,9 @@ for ( let i=0; i<127; ++i ) {
 <label for="show_mapping_i2c">Show I2C mappings:</label>
 <input id='show_mapping_i2c' type='checkbox' accesskey="2" onchange="toggleMappings('i2c')">
 <br>
-<div15:06 15/04/2022 id='alg_name'>
-<label for="active_alg_name">Algorithm:</label><input id='active_alg_name' accesskey='a' type='text' readonly>
-</div>
+<label for="alg_name_menu">Algorithm:</label>
+<select id="alg_name_menu"  onchange='changeAlgorithm()'></select>
+<button onclick="enterDualMode()">Enter dual mode</button>
 <br>
 <label for="preset_name">Preset name:</label><input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
 <label for="mapping_name">Mapping name:</label>
@@ -176,7 +172,7 @@ function processAlgorithm( data ) {
 			}
 			name += String.fromCharCode( n );
 		}
-		document.getElementById( "active_alg_name" ).value = (alg0+1) + " - " + name;
+		document.getElementById( "alg_name_menu" ).value = alg0;
 	}
 }
 
@@ -255,6 +251,27 @@ function processUnitStrings( data ) {
 	}
 }
 
+algorithmNames = []
+function processAlgorithmNames( data ) {
+	let num = data[0];
+	let c = 1;
+	algorithmNames = [];
+	let str = "";
+    for ( let j = 0; j < num; ++j ) {
+		let name = "";
+		for ( let i = 0; i < 100; ++i ) {
+			let n = data[c++];
+			if ( n == 0 ) {
+				break;
+			}
+			name += String.fromCharCode( n );
+		}
+		algorithmNames.push( name );
+		str += "<option value=" + j + ">" + name + "</option>";
+	}
+	document.getElementById( 'alg_name_menu' ).innerHTML = str;
+}
+
 function processEnumStrings( data ) {
 	var p = data[0];
 	var num = data[1];
@@ -325,6 +342,7 @@ function processMapping( data ) {
 		if ( flags & 4 ) {
 			cc = 128;
 		}
+		document.getElementById( "p" + i + "_midi_ch" ).value = ( flags >> 3 ) & 3;
 		document.getElementById( "p" + i + "_midi_cc" ).value = cc;
 		document.getElementById( "p" + i + "_midi_en" ).checked = flags & 1;
 		document.getElementById( "p" + i + "_midi_sym" ).checked = flags & 2;
@@ -363,12 +381,12 @@ function getNextParameter() {
 function processNumParameters( num ) {
 	var str = "<table>";
 	str += "<thead>";
-	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=3 class='map_button'>Button Mapping</th><th colspan=5 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
+	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=3 class='map_button'>Button Mapping</th><th colspan=6 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
 	str += "<tr><th></th><th>Name</th><th>Min</th><th>Max</th><th>Default</th><th>Unit</th><th>Value</th><th>Control</th>";
 	str += "<th class='map_cv'>Input</th><th class='map_cv'>Unipolar</th><th class='map_cv'>Gate</th><th class='map_cv'>Scale</th>";
 	str += "<th class='map_knob'>Knob</th><th class='map_knob'>Rel</th><th class='map_knob'>Bipolar</th><th class='map_knob'>Offset</th><th class='map_knob'>Scale</th>";
 	str += "<th class='map_button'>Button</th><th class='map_button'>Latching</th><th class='map_button'>Offset</th>";
-	str += "<th class='map_midi'>CC</th><th class='map_midi'>Enabled</th><th class='map_midi'>Symmetric</th><th class='map_midi'>Min</th><th class='map_midi'>Max</th>";
+	str += "<th class='map_midi'>Channel</th><th class='map_midi'>CC</th><th class='map_midi'>Enabled</th><th class='map_midi'>Symmetric</th><th class='map_midi'>Min</th><th class='map_midi'>Max</th>";
 	str += "<th class='map_i2c'>ID</th><th class='map_i2c'>Enabled</th><th class='map_i2c'>Symmetric</th><th class='map_i2c'>Min</th><th class='map_i2c'>Max</th>";
 	str += "</tr>";
 	str += "</thead><tbody>";
@@ -410,6 +428,10 @@ function processNumParameters( num ) {
 			str += "<td colspan=4 class='map_cv'></td><td colspan=5 class='map_knob'></td><td colspan=3 class='map_button'></td>";
 		}
 
+			str += "<td class='map_midi'><select id=p" + i + "_midi_ch class='param_v' onchange='mapping_midi_ch(" + i + ")'>";
+			for ( let j=0; j<4; ++j ) {
+				str += "<option value=" + j + ">" + j + "</option>";
+			}
 			str += "<td class='map_midi'><select id=p" + i + "_midi_cc class='param_v' onchange='mapping_midi_cc(" + i + ")'>";
 			for ( let j=0; j<128; ++j ) {
 				str += "<option value=" + j + ">" + j + "</option>";
@@ -730,10 +752,11 @@ function mapping_button_offset( p ) {
 }
 
 function mapping_midi( p ) {
+	let ch = document.getElementById( "p" + p + "_midi_ch" ).value;
 	let cc = document.getElementById( "p" + p + "_midi_cc" ).value;
 	let en = document.getElementById( "p" + p + "_midi_en" ).checked;
 	let sym = document.getElementById( "p" + p + "_midi_sym" ).checked;
-	let flags = en | ( sym << 1 );
+	let flags = en | ( sym << 1 ) | ( ( ch & 3 ) << 3 );
 	let min = document.getElementById( "p" + p + "_midi_min" ).value;
 	let max = document.getElementById( "p" + p + "_midi_max" ).value;
 	
@@ -749,6 +772,9 @@ function mapping_midi( p ) {
 	dumpSysex( arr, "txSysex", dd+"\n" );
 }
 
+function mapping_midi_ch( p ) {
+	mapping_midi( p );
+}
 function mapping_midi_cc( p ) {
 	mapping_midi( p );
 }
@@ -944,10 +970,16 @@ function onMIDIMessage(message) {
 		processMapping( data.slice( 7, -1 ) );
 	} else if ( data[6] == 0x50 ) {
 		processParameterValueString( data.slice( 7, -1 ) );
+	} else if ( data[6] == 0x52 ) {
+		processAlgorithmNames( data.slice( 7, -1 ) );
 	}
 }
 function request() {
 	var output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x52, 0xF7 ];
+	output.send( arr );
+	var dd = log( "sent algorithm names request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
 	var arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x40, 0xF7 ];
 	output.send( arr );
 	var dd = log( "sent algorithm request to disting EX" );
@@ -965,6 +997,22 @@ function request() {
 	var dd = log( "sent num parameters request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
 	mappingRefreshed = false;
+}
+function changeAlgorithm() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let alg = document.getElementById( 'alg_name_menu' ).value;
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x51, 0, alg, 0, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent change algorithm request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	request();
+}
+function enterDualMode() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x51, 1, 0, 0, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent enter dual mode request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
 }
 function sendMsg() {
 	var str = makeMsgSysEx();
