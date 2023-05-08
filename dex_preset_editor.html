@@ -92,10 +92,10 @@ function makeMsgSysEx() {
 	return str;
 }
 function dumpSysex( data, id, prefix ) {
-	var len = data.length
-	var h = prefix
-	for ( var i = 0; i < len; ++i ) {
-		var b = data[ i ];
+	let len = data.length
+	let h = prefix
+	for ( let i = 0; i < len; ++i ) {
+		let b = data[ i ];
 		h += nybbleChar( b >> 4 );
 		h += nybbleChar( b & 0xf );
 		h += " ";
@@ -103,7 +103,13 @@ function dumpSysex( data, id, prefix ) {
 			h += "\n";
 		}
 	} 
-	document.getElementById( id ).value = h;
+	if ( document.getElementById( 'keep_log').checked ) {
+		h += "\n";
+		document.getElementById( id ).value += h;
+	}
+	else {
+		document.getElementById( id ).value = h;
+	}
 }
 </script>
 
@@ -131,6 +137,7 @@ for ( let i=0; i<127; ++i ) {
 }
 </script>
 </select>
+<label for="keep_log">Keep full log:</label><input id='keep_log' type='checkbox'>
 <p>
 <label class="hidden" for="log">Log:</label><textarea rows=5 cols=50 id="log" accesskey="l" class="log" readOnly></textarea>
 <label class="hidden" for="txSysex">SysEx sent:</label><textarea rows=5 cols=45 name="text" id="txSysex" accesskey="y"></textarea>
@@ -379,6 +386,10 @@ function getNextParameter() {
 }
 
 function processNumParameters( num ) {
+	if ( num >= 128 ) {
+		alert( "Invalid num parameters in processNumParameters()" );
+		return;
+	}
 	var str = "<table>";
 	str += "<thead>";
 	str += "<tr><th colspan=8>Preset</th><th colspan=4 class='map_cv'>CV Mapping</th><th colspan=5 class='map_knob'>Knob Mapping</th><th colspan=3 class='map_button'>Button Mapping</th><th colspan=6 class='map_midi'>MIDI Mapping</th><th colspan=5 class='map_i2c'>I2C Mapping</th></tr>";
