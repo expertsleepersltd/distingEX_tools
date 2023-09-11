@@ -349,6 +349,9 @@ function processMapping( data ) {
 		if ( flags & 4 ) {
 			cc = 128;
 		}
+		if ( document.getElementById( "p" + i + "_midi_ch" ) == null ) {
+			continue;
+		}
 		document.getElementById( "p" + i + "_midi_ch" ).value = ( flags >> 3 ) & 3;
 		document.getElementById( "p" + i + "_midi_cc" ).value = cc;
 		document.getElementById( "p" + i + "_midi_en" ).checked = flags & 1;
@@ -362,6 +365,9 @@ function processMapping( data ) {
 		let flags = data[c]; c++;
 		let min = extractShort( data.slice( c, c+3 ) ); c += 3;
 		let max = extractShort( data.slice( c, c+3 ) ); c += 3;
+		if ( document.getElementById( "p" + i + "_i2c_cc" ) == null ) {
+			continue;
+		}
 		document.getElementById( "p" + i + "_i2c_cc" ).value = cc;
 		document.getElementById( "p" + i + "_i2c_en" ).checked = flags & 1;
 		document.getElementById( "p" + i + "_i2c_sym" ).checked = flags & 2;
@@ -381,8 +387,13 @@ function getNextParameter() {
 	dumpSysex( arr, "txSysex", dd+"\n" );
 	
 	nextParameterToGet += 1;
-	if ( nextParameterToGet < numParametersToGet )
-		setTimeout( getNextParameter, 20 );
+	if ( nextParameterToGet >= 86 ) {
+		return;
+	}
+	if ( nextParameterToGet < 80 && nextParameterToGet >= numParametersToGet ) {
+		nextParameterToGet = 80;
+	}
+	setTimeout( getNextParameter, 20 );
 }
 
 function processNumParameters( num ) {
@@ -402,8 +413,10 @@ function processNumParameters( num ) {
 	str += "</tr>";
 	str += "</thead><tbody>";
 
-	var i;
-	for ( i=0; i<num; ++i ) {
+	for ( let i=0; i<86; ++i ) {
+		if  ( i == num ) {
+			i = 80;
+		}
 		str += "<tr id=row" + i + " class=" + ((i&1)?"a":"b") + "><td>" + (i+1) + "</td>";
 		str += "<td id=p" + i + "_name><h1>" + "</h1></td>";
 		str += "<td id=p" + i + "_min>" + "</td>";
@@ -546,6 +559,9 @@ function processAllParameterValues( data ) {
 	for ( p=0; p<num; ++p ) {
 		var v = extractShort( data.slice( c, c+3 ) );
 		c += 3;
+		if ( document.getElementById( "p" + p + "_v" ) == null ) {
+			continue;
+		}
 		document.getElementById( "p" + p + "_v" ).value = v;
 	    document.getElementById( "p" + p + "_s" ).value = v;
 	    document.getElementById( "p" + p + "_e" ).value = v;

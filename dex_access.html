@@ -311,6 +311,8 @@ for ( let i=0; i<127; ++i ) {
 <button onclick="remote(controlEvents.V_CW)">V CW</button>
 <button onclick="remote(controlEvents.V_CCW)">V CCW</button>
 <button onclick="remote(controlEvents.V_LongPress)">V long push</button>
+<button onclick="remote(controlEvents.V_Hold)">V hold</button>
+<button onclick="remote(controlEvents.V_Release)">V release</button>
 <button onclick="remote(controlEvents.L_Press)">L push</button>
 <button onclick="remote(controlEvents.R_Press)">R push</button>
 <button onclick="reqAllText()" accesskey="r">Refresh Display</button>
@@ -359,6 +361,8 @@ const displayResponses =
         V_LongPress: 7,
         L_Press: 8,
         R_Press: 9,
+        V_Hold: 10,
+        V_Release: 11,
     }
 
 function logKey(e) {
@@ -522,6 +526,8 @@ function parseDisplayResponse( data )
 		break;
 
 		case controlEvents.V_LongPress:
+		case controlEvents.V_Hold:
+		case controlEvents.V_Release:
 		{
 			setTimeout( reqAllText, 100 );
 		}
