@@ -159,9 +159,19 @@ for ( let i=0; i<127; ++i ) {
 <select id="alg_name_menu"  onchange='changeAlgorithm()'></select>
 <button onclick="enterDualMode()">Enter dual mode</button>
 <br>
-<label for="preset_name">Preset name:</label><input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
+<label for="preset_name">Preset name:</label>
+<input id='preset_name' accesskey='p' type='text' onchange='send_preset_name()'>
 <label for="mapping_name">Mapping name:</label>
 <input id='mapping_name' accesskey='n' type='text' onchange='send_mapping_name()'>
+<label for="preset_slot">Preset slot:</label>
+<input id='preset_slot' type='number' min='1' max='256'>
+<button onclick="savePreset()">Save preset</button>
+<button onclick="loadPreset()">Load preset</button>
+<label for="mapping_slot">Mapping slot:</label>
+<input id='mapping_slot' type='number' min='1' max='64'>
+<button onclick="saveMapping()">Save mapping</button>
+<button onclick="loadMapping()">Load mapping</button>
+
 <div id='parameters'></div>
 
 <script>
@@ -1040,6 +1050,40 @@ function enterDualMode() {
 	output.send( arr );
 	let dd = log( "sent enter dual mode request to disting EX" );
 	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function savePreset() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let slot = document.getElementById( 'preset_slot' ).value - 1;
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x25, slot >> 7, slot & 0x7F, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent save preset request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function loadPreset() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let slot = document.getElementById( 'preset_slot' ).value - 1;
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x23, slot >> 7, slot & 0x7F, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent load preset request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	setTimeout( request, 100 );
+}
+function saveMapping() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let slot = document.getElementById( 'mapping_slot' ).value - 1;
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x26, slot & 0x7F, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent save mapping request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+}
+function loadMapping() {
+	let output = midi.outputs.get( document.getElementById( "midioutput" ).value );
+	let slot = document.getElementById( 'mapping_slot' ).value - 1;
+	let arr = [ 0xF0, 0x00, 0x21, 0x27, 0x5D, sysExId, 0x24, slot & 0x7F, 0xF7 ];
+	output.send( arr );
+	let dd = log( "sent load mapping request to disting EX" );
+	dumpSysex( arr, "txSysex", dd+"\n" );
+	setTimeout( request, 100 );
 }
 function sendMsg() {
 	var str = makeMsgSysEx();
