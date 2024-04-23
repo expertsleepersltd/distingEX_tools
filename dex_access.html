@@ -271,10 +271,10 @@ At the time of writing this will work only in Google's <a href="http://www.googl
 This version is for disting EX firmware v1.13 and above.
 </div>
 <p>
-<label for="midioutput">Send to MIDI port:</label>
-<select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
-<label for="midiinput">Listen on MIDI port: </label>
+<label for="midiinput">MIDI input port: </label>
 <select id="midiinput" onchange="changeInput()" accesskey="i"></select>
+<label for="midioutput">MIDI output port: </label>
+<select id="midioutput" onchange='changeOutput()' accesskey="o"></select>
 <label for="sysExId">SysEx ID: </label>
 <select id="sysExId" onchange='changeSysExId()' accesskey="s">
 <script>
@@ -664,6 +664,7 @@ case controlEvents.V_LongPress:
 let line1 = document.getElementById("display1").textContent.trim();
 let line2 = document.getElementById("display2").textContent.trim();
 let line3 = document.getElementById("display3").textContent.trim();
+let line4 = document.getElementById("display4").textContent.trim();
 document.getElementById("info_alert").innerHTML = line1 + " " + line2 + " = " + line3.substr(line3.indexOf( " "));
 }
 break;
@@ -675,7 +676,13 @@ case controlEvents.V_CW:
 {
 let line2 = document.getElementById("display2").textContent.trim();
 let line3 = document.getElementById("display3").textContent.trim();
-document.getElementById("info_alert").innerHTML = line2 + " = " + line3.substr(line3.indexOf( " "));
+let line4 = document.getElementById("display4").textContent.trim();
+
+if (line3.includes("PUSH V")) {
+document.getElementById("info_alert").innerHTML = line4 + " " + line3 + " to select";
+} else {
+document.getElementById("info_alert").innerHTML = line2 + " = " + line3.substr(line3.indexOf( " ")) + " " + line4;
+}
 }
 break;
 
@@ -691,6 +698,7 @@ break;
 		case displayModes.displayModeMenu:
 			{
 let line3 = document.getElementById("display3").textContent.trim();
+let line4 = document.getElementById("display4").textContent.trim();
 
 if (line3 != "") {
 document.getElementById("info_alert").innerHTML = line3;
