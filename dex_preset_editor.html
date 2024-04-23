@@ -549,7 +549,7 @@ function processParameterInfo( data ) {
 		var v = document.getElementById( "p" + p + "_s" ).value;
 		e.checked = v != 0;
 		e.style = 'display:inline;';
-	} else if ( unit == 19 ) {
+	} else if ( unit == 18 || unit == 19 ) {
 		unitStr = "<br>";
 		setTimeout( requestParameterValueString, 1000, p );
 	} else if ( unit > 0 && (unit-1) < unitStrings.length ) {
@@ -596,7 +596,14 @@ function processParameterValueString( data ) {
 		if ( n == 0 ) {
 			break;
 		}
-		name += String.fromCharCode( n );
+		let c = String.fromCharCode( n );
+		if ( c == "<" ) {
+			name += "&lt;";
+		} else if ( c == ">" ) {
+			name += "&gt;";
+		} else {
+			name += c;
+		}
 	}
     document.getElementById( "p" + p + "_pv" ).innerHTML = name;
 }
