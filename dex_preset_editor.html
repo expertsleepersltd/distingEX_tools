@@ -164,11 +164,11 @@ for ( let i=0; i<127; ++i ) {
 <label for="mapping_name">Mapping name:</label>
 <input id='mapping_name' accesskey='n' type='text' onchange='send_mapping_name()'>
 <label for="preset_slot">Preset slot:</label>
-<input id='preset_slot' type='number' min='1' max='256'>
+<input id='preset_slot' type='number' min='1' max='256' value='1''>
 <button onclick="savePreset()">Save preset</button>
 <button onclick="loadPreset()">Load preset</button>
 <label for="mapping_slot">Mapping slot:</label>
-<input id='mapping_slot' type='number' min='1' max='64'>
+<input id='mapping_slot' type='number' min='1' max='64' value='1''>
 <button onclick="saveMapping()">Save mapping</button>
 <button onclick="loadMapping()">Load mapping</button>
 
